@@ -16,15 +16,16 @@ async function runIndexing(channelId, channelName) {
       active: true,
       channel_name: channelName,
       processed: 0,
+      skipped: 0,
       total: null,
       error: null,
     },
   });
 
   try {
-    const count = await indexChannel(channelId, channelName, (processed) => {
+    const { processed, skipped } = await indexChannel(channelId, channelName, (p, s) => {
       setState({
-        indexing: { ...getState().indexing, processed },
+        indexing: { ...getState().indexing, processed: p, skipped: s },
       });
     });
 
@@ -32,8 +33,9 @@ async function runIndexing(channelId, channelName) {
       indexing: {
         active: false,
         channel_name: channelName,
-        processed: count,
-        total: count,
+        processed,
+        skipped,
+        total: processed,
         error: null,
       },
     });
@@ -43,6 +45,7 @@ async function runIndexing(channelId, channelName) {
         active: false,
         channel_name: null,
         processed: 0,
+        skipped: 0,
         total: null,
         error: err.message,
       },
@@ -71,8 +74,6 @@ router.post('/', async (req, res) => {
   );
 
   res.json({ id: channel.id, name: channel.name });
-
-  // Async indexing fires after response is sent
   runIndexing(channel.id, channel.name);
 });
 

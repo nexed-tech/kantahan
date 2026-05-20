@@ -6,7 +6,8 @@ function getQueue() {
   return db
     .prepare(
       `SELECT q.id, q.singer_name, q.position, q.status, q.added_at,
-              s.id AS song_id, s.title, s.artist, s.source, s.thumbnail_url, s.channel_name
+              s.id AS song_id, s.title, s.artist, s.source, s.file_type,
+              s.thumbnail_url, s.channel_name, s.duration_seconds
        FROM queue q
        JOIN songs s ON s.id = q.song_id
        WHERE q.status = 'pending'
@@ -22,8 +23,10 @@ function getQueue() {
         title: r.title,
         artist: r.artist,
         source: r.source,
+        file_type: r.file_type,
         thumbnail_url: r.thumbnail_url,
         channel_name: r.channel_name,
+        duration_seconds: r.duration_seconds,
       },
     }));
 }

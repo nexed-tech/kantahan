@@ -4,6 +4,61 @@ const { getQueue, syncQueue } = require('./queueService');
 
 let countdownTimer = null;
 
+// ── Progress tracking ─────────────────────────────────────────────────────────
+let progressTimer = null;
+let elapsedAtPause = 0;
+let resumeTimestamp = null;
+let currentDuration = 0;
+
+function getCurrentElapsed() {
+  if (resumeTimestamp === null) return elapsedAtPause;
+  return elapsedAtPause + Math.round((Date.now() - resumeTimestamp) / 1000);
+}
+
+function startProgressTimer(durationSeconds) {
+  stopProgressTimer();
+  currentDuration = durationSeconds || 0;
+  elapsedAtPause = 0;
+  resumeTimestamp = Date.now();
+  setState({ playback_position: { elapsed_seconds: 0, duration_seconds: currentDuration } });
+  progressTimer = setInterval(() => {
+    setState({
+      playback_position: {
+        elapsed_seconds: getCurrentElapsed(),
+        duration_seconds: currentDuration,
+      },
+    });
+  }, 1000);
+}
+
+function pauseProgressTimer() {
+  elapsedAtPause = getCurrentElapsed();
+  resumeTimestamp = null;
+  if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+}
+
+function resumeProgressTimer() {
+  if (progressTimer) return;
+  resumeTimestamp = Date.now();
+  progressTimer = setInterval(() => {
+    setState({
+      playback_position: {
+        elapsed_seconds: getCurrentElapsed(),
+        duration_seconds: currentDuration,
+      },
+    });
+  }, 1000);
+}
+
+function stopProgressTimer() {
+  if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+  elapsedAtPause = 0;
+  resumeTimestamp = null;
+  setState({ playback_position: { elapsed_seconds: 0, duration_seconds: 0 } });
+}
+
+// ── Countdown ─────────────────────────────────────────────────────────────────
+
 function stopCountdown() {
   if (countdownTimer) {
     clearInterval(countdownTimer);
@@ -19,6 +74,7 @@ function playerCmd(action, videoId = null) {
 
 function goIdle() {
   stopCountdown();
+  stopProgressTimer();
   setState({
     mode: 'idle',
     now_playing: null,
@@ -51,10 +107,13 @@ function startNextSong() {
     queue: updatedQueue,
     player_command: { action: 'load', video_id: next.song.id, timestamp: Date.now() },
   });
+
+  startProgressTimer(next.song.duration_seconds || 0);
 }
 
 function beginCountdown() {
   stopCountdown();
+  stopProgressTimer();
   const queue = getQueue();
 
   if (queue.length === 0) {
@@ -129,6 +188,7 @@ function skipSong() {
 }
 
 function pausePlayback() {
+  pauseProgressTimer();
   playerCmd('pause');
 }
 
@@ -137,6 +197,7 @@ function resumePlayback() {
   if (s.mode === 'idle' || s.mode === 'between') {
     startNextSong();
   } else if (s.mode === 'playing') {
+    resumeProgressTimer();
     playerCmd('play');
   }
 }

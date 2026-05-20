@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWebSocket } from '../../shared/useWebSocket';
+import logoUrl from './assets/logo-marquee-primary-animated.svg';
+import { CDGRenderer } from './cdgRenderer';
 
 function loadYouTubeAPI() {
   return new Promise((resolve) => {
@@ -29,66 +31,65 @@ function parseBgUrl(url) {
 function QrImg({ url, size = 200 }) {
   if (!url) return null;
   return (
-    <img
-      src={`/api/qr?url=${encodeURIComponent(url)}`}
-      alt="QR"
-      width={size}
-      height={size}
-    />
+    <img src={`/api/qr?url=${encodeURIComponent(url)}`} alt="QR" width={size} height={size} />
   );
 }
 
 function IdleScreen({ requestUrl }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-8">
-      <h1 className="text-8xl font-bold tracking-tight text-white select-none">Kantahan</h1>
-      <p className="text-2xl text-gray-400">Scan to request a song</p>
+      <div className="text-center space-y-2">
+        <p className="text-brand-dim font-mono uppercase tracking-[0.35em] text-sm">
+          Scan to request a song
+        </p>
+        <p className="text-brand-ink/60 text-xl">Pick a song &amp; get in the queue</p>
+      </div>
       {requestUrl && (
-        <div className="bg-white rounded-2xl p-4 shadow-2xl">
-          <QrImg url={requestUrl} size={220} />
+        <div className="bg-white rounded-2xl p-5 shadow-2xl shadow-brand-purple/20">
+          <QrImg url={requestUrl} size={240} />
         </div>
       )}
-      {requestUrl && (
-        <p className="text-gray-600 font-mono text-base">{requestUrl}</p>
-      )}
+      {requestUrl && <p className="text-brand-dim font-mono text-base">{requestUrl}</p>}
     </div>
   );
 }
 
 function BetweenScreen({ countdown, queue, requestUrl }) {
-  const nextSong = countdown?.next_song;
+  const nextSong   = countdown?.next_song;
   const nextSinger = countdown?.next_singer;
-  const upcoming = (queue || []).slice(1, 5);
-  const waiting = !countdown?.active || countdown.seconds_remaining === 0;
+  const upcoming   = (queue || []).slice(1, 5);
+  const waiting    = !countdown?.active || countdown.seconds_remaining === 0;
 
   return (
     <div className="relative flex flex-col items-center justify-center h-full gap-5 px-12">
-      <p className="text-gray-500 text-xl uppercase tracking-widest">Up next</p>
-      <h2 className="text-6xl font-bold text-white text-center leading-tight">
+      <p className="text-brand-dim font-mono text-sm uppercase tracking-[0.35em]">Up next</p>
+      <h2 className="font-display font-black text-6xl text-brand-ink text-center leading-tight"
+          style={{ fontStretch: '125%' }}>
         {nextSinger || '—'}
       </h2>
-      <p className="text-4xl text-purple-300 text-center">{nextSong?.title || '—'}</p>
+      <p className="text-4xl text-brand-purple text-center">{nextSong?.title || '—'}</p>
 
-      <div className="mt-2 h-24 flex items-center justify-center">
+      <div className="mt-2 h-28 flex items-center justify-center">
         {!waiting ? (
-          <span className="text-9xl font-mono font-bold text-yellow-400 tabular-nums">
+          <span className="text-9xl font-mono font-bold text-brand-amber tabular-nums"
+                style={{ textShadow: '0 0 40px #ffb627, 0 0 80px #ffb62760' }}>
             {countdown.seconds_remaining}
           </span>
         ) : (
-          <p className="text-gray-500 text-2xl">Waiting for DJ...</p>
+          <p className="text-brand-dim font-mono text-2xl">Waiting for DJ...</p>
         )}
       </div>
 
       {upcoming.length > 0 && (
         <div className="mt-4 w-full max-w-lg">
-          <p className="text-gray-600 text-sm uppercase tracking-widest mb-3 text-center">
+          <p className="text-brand-dim/60 font-mono text-xs uppercase tracking-[0.35em] mb-3 text-center">
             Coming up
           </p>
           <ul className="space-y-2">
             {upcoming.map((item) => (
-              <li key={item.id} className="flex justify-between text-gray-400 text-lg px-2">
+              <li key={item.id} className="flex justify-between text-brand-dim text-lg px-2">
                 <span>{item.singer}</span>
-                <span className="text-gray-600 truncate max-w-xs text-right ml-6">
+                <span className="text-brand-dim/50 truncate max-w-xs text-right ml-6">
                   {item.song?.title}
                 </span>
               </li>
@@ -98,7 +99,7 @@ function BetweenScreen({ countdown, queue, requestUrl }) {
       )}
 
       {requestUrl && (
-        <div className="absolute bottom-6 right-6 bg-white rounded-xl p-2 opacity-70">
+        <div className="absolute bottom-6 right-6 bg-white rounded-xl p-2 opacity-60">
           <QrImg url={requestUrl} size={100} />
         </div>
       )}
@@ -109,25 +110,23 @@ function BetweenScreen({ countdown, queue, requestUrl }) {
 function NowPlayingOverlay({ nowPlaying }) {
   if (!nowPlaying) return null;
   return (
-    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black via-black/60 to-transparent px-10 py-8 pointer-events-none">
-      <p className="text-white text-5xl font-bold leading-tight drop-shadow-xl">
+    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-10 py-8 pointer-events-none">
+      <p className="text-brand-dim font-mono text-sm uppercase tracking-[0.3em] mb-1">Now singing</p>
+      <p className="font-display font-black text-5xl text-brand-ink leading-tight drop-shadow-xl"
+         style={{ fontStretch: '125%' }}>
         {nowPlaying.song?.title || '—'}
       </p>
-      <p className="text-gray-300 text-3xl mt-2 drop-shadow-lg">{nowPlaying.singer}</p>
+      <p className="text-brand-dim text-2xl mt-1 drop-shadow-lg">{nowPlaying.singer}</p>
     </div>
   );
 }
 
-function EmbedErrorOverlay({ code }) {
-  const msg =
-    code === 101 || code === 150
-      ? 'Embedding disabled for this video'
-      : 'Video not found or playback error';
+function PlaybackErrorOverlay({ message }) {
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950">
-      <p className="text-red-400 text-3xl font-bold">Video unavailable</p>
-      <p className="text-gray-400 mt-3 text-xl">{msg}</p>
-      <p className="text-gray-600 mt-6 text-lg">Skipping to next song...</p>
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-bg z-10">
+      <p className="text-brand-pink text-3xl font-bold">Playback error</p>
+      <p className="text-brand-dim mt-3 text-xl">{message}</p>
+      <p className="text-brand-dim/50 mt-6 text-lg">Skipping to next song...</p>
     </div>
   );
 }
@@ -135,23 +134,32 @@ function EmbedErrorOverlay({ code }) {
 export default function App() {
   const { state, connected } = useWebSocket();
 
-  // Karaoke player
-  const ytDivRef = useRef(null);
-  const playerRef = useRef(null);
-  const playerReadyRef = useRef(false);
-  const pendingCmdRef = useRef(null);
-  const lastCmdTs = useRef(0);
-  const [playerError, setPlayerError] = useState(null);
+  // ── YouTube karaoke player ───────────────────────────────────────────────
+  const ytDivRef        = useRef(null);
+  const playerRef       = useRef(null);
+  const playerReadyRef  = useRef(false);
+  const pendingCmdRef   = useRef(null);
+  const lastCmdTs       = useRef(0);
+  const [ytError, setYtError] = useState(null);
 
-  // Background music player
-  const bgDivRef = useRef(null);
-  const bgPlayerRef = useRef(null);
+  // ── Local file player ────────────────────────────────────────────────────
+  const localVideoRef   = useRef(null);  // <video> for mkv/mp4
+  const localAudioRef   = useRef(null);  // <audio> for cdg
+  const localCanvasRef  = useRef(null);  // <canvas> for cdg graphics
+  const cdgRendererRef  = useRef(null);
+  const cdgAnimRef      = useRef(null);
+  const loadedLocalId   = useRef(null);
+  const [localError, setLocalError]  = useState(null);
+
+  // ── Background music player ──────────────────────────────────────────────
+  const bgDivRef        = useRef(null);
+  const bgPlayerRef     = useRef(null);
   const bgPlayerReadyRef = useRef(false);
-  const lastBgUrlRef = useRef('');
+  const lastBgUrlRef    = useRef('');
 
-  // Always-current refs so stale closures (onReady callbacks) can read latest state
+  // Always-current refs (safe for stale closures)
   const modeRef = useRef('idle');
-  const bgmRef = useRef(null);
+  const bgmRef  = useRef(null);
 
   const [info, setInfo] = useState(null);
 
@@ -159,73 +167,61 @@ export default function App() {
     fetch('/api/info').then((r) => r.json()).then(setInfo).catch(() => {});
   }, []);
 
-  const mode = state?.mode || 'idle';
-  const bgm = state?.background_music;
+  const mode          = state?.mode || 'idle';
+  const bgm           = state?.background_music;
+  const nowPlaying    = state?.now_playing;
+  const nowSong       = nowPlaying?.song;
+  const isLocalSong   = nowSong?.source === 'local';
+  const localType     = nowSong?.file_type;
+  const isLocalVideo  = localType === 'mkv' || localType === 'mp4';
+  const isLocalCdg    = localType === 'cdg' || localType === 'mp3cdg_zip';
 
-  // Keep always-current refs up to date
   modeRef.current = mode;
-  bgmRef.current = bgm;
+  bgmRef.current  = bgm;
 
-  // ── Karaoke player ───────────────────────────────────────────────────────
+  // ── YouTube player setup ──────────────────────────────────────────────────
 
-  function execCmd(cmd) {
+  function execYtCmd(cmd) {
     if (!playerRef.current || !playerReadyRef.current) {
       pendingCmdRef.current = cmd;
       return;
     }
-    setPlayerError(null);
+    setYtError(null);
     const p = playerRef.current;
-    if (cmd.action === 'load') p.loadVideoById(cmd.video_id);
-    else if (cmd.action === 'play') p.playVideo();
+    if (cmd.action === 'load')  p.loadVideoById(cmd.video_id);
+    else if (cmd.action === 'play')  p.playVideo();
     else if (cmd.action === 'pause') p.pauseVideo();
-    else if (cmd.action === 'stop') p.stopVideo();
+    else if (cmd.action === 'stop')  p.stopVideo();
   }
 
   useEffect(() => {
     let cancelled = false;
-
     loadYouTubeAPI().then(() => {
       if (cancelled || !ytDivRef.current || playerRef.current) return;
-
       playerRef.current = new window.YT.Player(ytDivRef.current, {
-        height: '100%',
-        width: '100%',
-        videoId: '',
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          disablekb: 1,
-          fs: 0,
-          iv_load_policy: 3,
-          modestbranding: 1,
-          rel: 0,
-          playsinline: 1,
-        },
+        height: '100%', width: '100%', videoId: '',
+        playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0,
+                      iv_load_policy: 3, modestbranding: 1, rel: 0, playsinline: 1 },
         events: {
           onReady: () => {
             playerReadyRef.current = true;
             if (pendingCmdRef.current) {
               const cmd = pendingCmdRef.current;
               pendingCmdRef.current = null;
-              execCmd(cmd);
+              execYtCmd(cmd);
             }
           },
           onStateChange: (e) => {
-            if (e.data === window.YT.PlayerState.ENDED) {
+            if (e.data === window.YT.PlayerState.ENDED)
               fetch('/api/playback/ended', { method: 'POST' }).catch(() => {});
-            }
           },
           onError: (e) => {
-            setPlayerError(e.data);
-            setTimeout(
-              () => fetch('/api/playback/ended', { method: 'POST' }).catch(() => {}),
-              2500
-            );
+            setYtError(e.data);
+            setTimeout(() => fetch('/api/playback/ended', { method: 'POST' }).catch(() => {}), 2500);
           },
         },
       });
     });
-
     return () => {
       cancelled = true;
       playerReadyRef.current = false;
@@ -236,39 +232,109 @@ export default function App() {
     };
   }, []);
 
+  // ── Local player: load when song changes ─────────────────────────────────
+
+  useEffect(() => {
+    if (!nowSong || nowSong.source !== 'local' || mode !== 'playing') {
+      cancelAnimationFrame(cdgAnimRef.current);
+      if (mode !== 'playing') loadedLocalId.current = null;
+      return;
+    }
+    if (loadedLocalId.current === nowSong.id) return;
+
+    loadedLocalId.current = nowSong.id;
+    setLocalError(null);
+    cancelAnimationFrame(cdgAnimRef.current);
+
+    function onLocalEnded() {
+      fetch('/api/playback/ended', { method: 'POST' }).catch(() => {});
+    }
+    function onLocalError(msg) {
+      setLocalError(msg);
+      setTimeout(onLocalEnded, 2500);
+    }
+
+    if (isLocalVideo && localVideoRef.current) {
+      const vid = localVideoRef.current;
+      vid.src = `/api/media/file/${nowSong.id}`;
+      vid.onerror = () => onLocalError('Video playback error — codec may not be supported');
+      vid.play().catch(() => {});
+    }
+
+    if (isLocalCdg) {
+      if (!cdgRendererRef.current) cdgRendererRef.current = new CDGRenderer();
+      const songId = nowSong.id;
+
+      fetch(`/api/media/cdg/${songId}`)
+        .then((r) => {
+          if (!r.ok) throw new Error(`CDG file not found (${r.status})`);
+          return r.arrayBuffer();
+        })
+        .then((buf) => {
+          if (loadedLocalId.current !== songId) return; // song changed mid-fetch
+          cdgRendererRef.current.load(buf);
+
+          const audio = localAudioRef.current;
+          if (audio) {
+            audio.src = `/api/media/file/${songId}`;
+            audio.onerror = () => onLocalError('Audio playback error');
+            audio.play().catch(() => {});
+          }
+
+          const loop = () => {
+            if (localAudioRef.current && localCanvasRef.current && cdgRendererRef.current) {
+              cdgRendererRef.current.renderToCanvas(
+                localCanvasRef.current,
+                localAudioRef.current.currentTime
+              );
+            }
+            cdgAnimRef.current = requestAnimationFrame(loop);
+          };
+          cdgAnimRef.current = requestAnimationFrame(loop);
+        })
+        .catch((err) => {
+          if (loadedLocalId.current === songId) onLocalError(err.message);
+        });
+    }
+
+    return () => cancelAnimationFrame(cdgAnimRef.current);
+  }, [nowSong?.id, nowSong?.source, mode]);
+
+  // ── Player command routing ────────────────────────────────────────────────
+
   useEffect(() => {
     const cmd = state?.player_command;
     if (!cmd || cmd.timestamp <= lastCmdTs.current) return;
     lastCmdTs.current = cmd.timestamp;
-    execCmd(cmd);
+
+    if (nowSong?.source === 'local') {
+      // 'load' is handled by the useEffect above (triggers on nowSong.id change)
+      const el = isLocalVideo ? localVideoRef.current : localAudioRef.current;
+      if (!el) return;
+      if (cmd.action === 'play')  el.play().catch(() => {});
+      if (cmd.action === 'pause') el.pause();
+      if (cmd.action === 'stop')  { el.pause(); el.currentTime = 0; }
+    } else {
+      execYtCmd(cmd);
+    }
   }, [state?.player_command]);
 
-  // ── Background music player ──────────────────────────────────────────────
+  // ── Background music player ───────────────────────────────────────────────
 
   function applyBgMusic() {
     const bm = bgmRef.current;
     const currentMode = modeRef.current;
     if (!bgPlayerReadyRef.current || !bm) return;
-
     bgPlayerRef.current.setVolume(Math.round((bm.volume ?? 0.4) * 100));
-
-    const shouldPlay =
-      bm.playing && !!bm.url && (currentMode === 'idle' || currentMode === 'between');
-
+    const shouldPlay = bm.playing && !!bm.url && (currentMode === 'idle' || currentMode === 'between');
     if (shouldPlay) {
       if (bm.url !== lastBgUrlRef.current) {
         lastBgUrlRef.current = bm.url;
         const parsed = parseBgUrl(bm.url);
-        if (parsed?.list) {
-          bgPlayerRef.current.loadPlaylist({ list: parsed.list, listType: 'playlist', index: 0 });
-        } else if (parsed?.video) {
-          bgPlayerRef.current.loadVideoById(parsed.video);
-        }
+        if (parsed?.list) bgPlayerRef.current.loadPlaylist({ list: parsed.list, listType: 'playlist', index: 0 });
+        else if (parsed?.video) bgPlayerRef.current.loadVideoById(parsed.video);
       } else {
-        // Resume if not already playing (state 1 = PLAYING)
-        if (bgPlayerRef.current.getPlayerState() !== 1) {
-          bgPlayerRef.current.playVideo();
-        }
+        if (bgPlayerRef.current.getPlayerState() !== 1) bgPlayerRef.current.playVideo();
       }
     } else {
       bgPlayerRef.current.pauseVideo();
@@ -277,23 +343,14 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-
     loadYouTubeAPI().then(() => {
       if (cancelled || !bgDivRef.current || bgPlayerRef.current) return;
-
       bgPlayerRef.current = new window.YT.Player(bgDivRef.current, {
-        height: '100%',
-        width: '100%',
-        videoId: '',
+        height: '100%', width: '100%', videoId: '',
         playerVars: { controls: 0, disablekb: 1, fs: 0, playsinline: 1 },
         events: {
-          onReady: (e) => {
-            bgPlayerReadyRef.current = true;
-            e.target.setLoop(true);
-            applyBgMusic();
-          },
+          onReady: (e) => { bgPlayerReadyRef.current = true; e.target.setLoop(true); applyBgMusic(); },
           onStateChange: (e) => {
-            // Loop single videos; playlists auto-advance
             if (e.data === window.YT.PlayerState.ENDED) {
               bgPlayerRef.current?.seekTo(0, true);
               bgPlayerRef.current?.playVideo();
@@ -302,7 +359,6 @@ export default function App() {
         },
       });
     });
-
     return () => {
       cancelled = true;
       bgPlayerReadyRef.current = false;
@@ -313,67 +369,103 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    applyBgMusic();
-  }, [mode, bgm?.playing, bgm?.url, bgm?.volume]);
+  useEffect(() => { applyBgMusic(); }, [mode, bgm?.playing, bgm?.url, bgm?.volume]);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   const requestUrl = info?.urls?.request;
-  const isPlaying = mode === 'playing';
+  const isPlaying  = mode === 'playing';
+  const hasError   = isPlaying && (ytError != null || localError != null);
+  const errorMsg   = localError || (ytError === 101 || ytError === 150
+    ? 'Embedding disabled for this video'
+    : ytError != null ? 'Video not found or playback error' : null);
 
   return (
-    <div className="w-screen h-screen bg-black relative overflow-hidden">
-      {/* Background video — visible during idle/between when BG music is active */}
-      <div
-        className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${
-          bgm?.playing && bgm?.url && !isPlaying ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
+    <div className="w-screen h-screen bg-brand-bg relative overflow-hidden">
+
+      {/* Subtle grid texture */}
+      <div className="absolute inset-0 pointer-events-none opacity-30"
+           style={{
+             backgroundImage:
+               'linear-gradient(rgba(168,85,247,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,0.06) 1px,transparent 1px)',
+             backgroundSize: '48px 48px',
+           }} />
+
+      {/* Background video (idle/between) */}
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${
+        bgm?.playing && bgm?.url && !isPlaying ? 'opacity-100' : 'opacity-0'
+      }`}>
         <div ref={bgDivRef} className="w-full h-full" />
       </div>
+      <div className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-1000 ${
+        bgm?.playing && bgm?.url && !isPlaying ? 'opacity-75' : 'opacity-0'
+      }`} />
 
-      {/* Dark overlay so foreground content stays readable over the background video */}
-      <div
-        className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-1000 ${
-          bgm?.playing && bgm?.url && !isPlaying ? 'opacity-75' : 'opacity-0'
-        }`}
-      />
-
-      {/* Karaoke player — visible only when playing */}
-      <div
-        className={`absolute inset-0 transition-opacity duration-300 ${
-          isPlaying && !playerError ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-      >
+      {/* YouTube karaoke player — only for YouTube songs */}
+      <div className={`absolute inset-0 transition-opacity duration-300 ${
+        isPlaying && !isLocalSong && !ytError ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}>
         <div ref={ytDivRef} className="w-full h-full" />
       </div>
 
-      {isPlaying && playerError && <EmbedErrorOverlay code={playerError} />}
+      {/* Local video player — mkv/mp4 */}
+      <div className={`absolute inset-0 transition-opacity duration-300 ${
+        isPlaying && isLocalSong && isLocalVideo && !localError ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}>
+        <video
+          ref={localVideoRef}
+          className="w-full h-full object-contain bg-black"
+          onEnded={() => fetch('/api/playback/ended', { method: 'POST' }).catch(() => {})}
+          playsInline
+        />
+      </div>
 
+      {/* CDG karaoke player — mp3+cdg */}
+      <div className={`absolute inset-0 bg-black flex items-center justify-center transition-opacity duration-300 ${
+        isPlaying && isLocalSong && isLocalCdg && !localError ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}>
+        <audio
+          ref={localAudioRef}
+          onEnded={() => fetch('/api/playback/ended', { method: 'POST' }).catch(() => {})}
+        />
+        <canvas
+          ref={localCanvasRef}
+          width={288}
+          height={192}
+          style={{ imageRendering: 'pixelated', height: '100%', width: 'auto' }}
+        />
+      </div>
+
+      {/* Error overlay */}
+      {hasError && <PlaybackErrorOverlay message={errorMsg} />}
+
+      {/* Idle / between screens */}
       {mode === 'idle' && <IdleScreen requestUrl={requestUrl} />}
       {mode === 'between' && (
-        <BetweenScreen
-          countdown={state?.countdown}
-          queue={state?.queue}
-          requestUrl={requestUrl}
-        />
+        <BetweenScreen countdown={state?.countdown} queue={state?.queue} requestUrl={requestUrl} />
       )}
 
-      {isPlaying && !playerError && (
-        <>
-          <NowPlayingOverlay nowPlaying={state?.now_playing} />
-          {requestUrl && (
-            <div className="absolute top-4 right-4 bg-white rounded-lg p-1.5 opacity-60 hover:opacity-95 transition-opacity">
-              <QrImg url={requestUrl} size={84} />
-            </div>
-          )}
-        </>
+      {/* Now playing overlay — works for all song types */}
+      {isPlaying && !hasError && <NowPlayingOverlay nowPlaying={nowPlaying} />}
+
+      {/* Logo — top-left, dims while playing */}
+      <div className={`absolute top-5 left-6 z-20 pointer-events-none transition-opacity duration-700 ${
+        isPlaying ? 'opacity-25' : 'opacity-90'
+      }`}>
+        <img src={logoUrl} alt="Kantahan" style={{ width: 220, height: 'auto' }} />
+      </div>
+
+      {/* Corner QR while playing */}
+      {isPlaying && !hasError && requestUrl && (
+        <div className="absolute top-4 right-4 bg-white rounded-lg p-1.5 opacity-50 hover:opacity-90 transition-opacity z-20">
+          <QrImg url={requestUrl} size={84} />
+        </div>
       )}
 
-      <div className="absolute top-2 left-2 flex items-center gap-1.5 z-50 opacity-20 hover:opacity-80 transition-opacity">
+      {/* Connection status */}
+      <div className="absolute bottom-3 left-4 flex items-center gap-1.5 z-50 opacity-20 hover:opacity-70 transition-opacity">
         <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'}`} />
-        <span className="text-xs text-gray-400">{mode}</span>
+        <span className="text-xs font-mono text-brand-dim">{mode}</span>
       </div>
     </div>
   );

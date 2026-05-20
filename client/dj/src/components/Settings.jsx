@@ -3,12 +3,15 @@ import { useState, useEffect } from 'react';
 function Field({ label, hint, children }) {
   return (
     <div className="space-y-1">
-      <label className="text-sm font-medium text-gray-300">{label}</label>
-      {hint && <p className="text-xs text-gray-500">{hint}</p>}
+      <label className="text-sm font-medium text-brand-dim">{label}</label>
+      {hint && <p className="text-xs text-brand-dim/50">{hint}</p>}
       {children}
     </div>
   );
 }
+
+const inputCls =
+  'bg-white/5 text-brand-ink text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-purple border border-white/10 focus:border-brand-purple/50 placeholder:text-brand-dim/30 transition-colors';
 
 export default function Settings({ indexing }) {
   const [apiKey, setApiKey] = useState('');
@@ -141,31 +144,27 @@ export default function Settings({ indexing }) {
     <div className="space-y-6">
       {/* Network info */}
       {info && (
-        <div className="bg-gray-800 rounded-xl p-4 space-y-1 text-sm">
-          <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">Network</p>
-          <p>
-            <span className="text-gray-400">Display: </span>
-            <span className="text-purple-300 font-mono">{info.urls.display}</span>
-          </p>
-          <p>
-            <span className="text-gray-400">DJ: </span>
-            <span className="text-purple-300 font-mono">{info.urls.dj}</span>
-          </p>
-          <p>
-            <span className="text-gray-400">Request: </span>
-            <span className="text-purple-300 font-mono">{info.urls.request}</span>
-          </p>
+        <div className="bg-white/5 rounded-xl p-4 space-y-1 text-sm border border-white/10">
+          <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest mb-2">Network</p>
+          {[['Display', info.urls.display], ['DJ', info.urls.dj], ['Request', info.urls.request]].map(
+            ([label, url]) => (
+              <p key={label}>
+                <span className="text-brand-dim/60">{label}: </span>
+                <span className="text-brand-purple font-mono">{url}</span>
+              </p>
+            )
+          )}
         </div>
       )}
 
       {/* YouTube API key */}
-      <div className="bg-gray-800 rounded-xl p-4 space-y-4">
-        <p className="text-gray-400 text-xs uppercase tracking-widest">YouTube</p>
+      <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
+        <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">YouTube</p>
         <Field
           label="API Key"
           hint={
             apiKeySet
-              ? 'A key is currently saved. Enter a new one to replace it, or leave blank to clear.'
+              ? 'A key is saved. Enter a new one to replace it, or leave blank to clear.'
               : 'Required for YouTube channel indexing and search.'
           }
         >
@@ -175,22 +174,20 @@ export default function Settings({ indexing }) {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder={apiKeySet ? '••••••••••••' : 'AIza...'}
-              className="flex-1 bg-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className={`flex-1 ${inputCls}`}
             />
             <button
               onClick={saveApiKey}
               disabled={saving}
-              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+              className="bg-brand-purple hover:bg-brand-purple/80 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors"
             >
               Save
             </button>
           </div>
-          {apiKeyMsg && <p className="text-green-400 text-xs mt-1">{apiKeyMsg}</p>}
+          {apiKeyMsg && <p className="text-green-400 text-xs mt-1 font-mono">{apiKeyMsg}</p>}
           <div className="flex items-center gap-2 mt-2">
-            <span
-              className={`w-2 h-2 rounded-full ${apiKeySet ? 'bg-green-400' : 'bg-gray-600'}`}
-            />
-            <span className="text-xs text-gray-400">
+            <span className={`w-2 h-2 rounded-full ${apiKeySet ? 'bg-green-400' : 'bg-white/20'}`} />
+            <span className="text-xs text-brand-dim/60 font-mono">
               {apiKeySet ? 'Key is configured' : 'No key set'}
             </span>
           </div>
@@ -198,49 +195,50 @@ export default function Settings({ indexing }) {
       </div>
 
       {/* YouTube channels */}
-      <div className="bg-gray-800 rounded-xl p-4 space-y-4">
-        <p className="text-gray-400 text-xs uppercase tracking-widest">YouTube Channels</p>
+      <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
+        <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">YouTube Channels</p>
 
-        {/* Indexing progress */}
         {isIndexing && (
           <div className="space-y-1">
-            <div className="flex justify-between text-xs text-gray-400">
+            <div className="flex justify-between text-xs text-brand-dim/60 font-mono">
               <span>Indexing {indexing.channel_name}...</span>
               <span>{indexing.processed} videos</span>
             </div>
-            <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
-              <div className="h-full bg-purple-500 animate-pulse w-full" />
+            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-brand-purple animate-pulse w-full" />
             </div>
           </div>
         )}
         {!isIndexing && indexing?.error && (
-          <p className="text-red-400 text-xs">Error: {indexing.error}</p>
+          <p className="text-brand-pink text-xs font-mono">Error: {indexing.error}</p>
         )}
         {!isIndexing && indexing?.processed > 0 && !indexing?.error && (
-          <p className="text-green-400 text-xs">
-            Indexed {indexing.processed} videos from {indexing.channel_name}
+          <p className="text-green-400 text-xs font-mono">
+            Indexed {indexing.processed} songs from {indexing.channel_name}
+            {indexing.skipped > 0 && (
+              <span className="text-brand-dim/60">, skipped {indexing.skipped} (embedding disabled)</span>
+            )}
           </p>
         )}
 
-        {/* Channel list */}
         {channels.length > 0 && (
           <ul className="space-y-2">
             {channels.map((ch) => (
               <li
                 key={ch.id}
-                className="flex items-center justify-between gap-3 bg-gray-700 rounded-lg px-3 py-2"
+                className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2 border border-white/5"
               >
                 <div className="min-w-0">
-                  <p className="text-white text-sm truncate">{ch.name}</p>
+                  <p className="text-brand-ink text-sm truncate">{ch.name}</p>
                   {ch.video_count > 0 && (
-                    <p className="text-gray-400 text-xs">{ch.video_count} videos</p>
+                    <p className="text-brand-dim/50 text-xs font-mono">{ch.video_count} videos</p>
                   )}
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button
                     onClick={() => reindexChannel(ch.id)}
                     disabled={isIndexing}
-                    className="text-xs bg-blue-800 hover:bg-blue-700 disabled:opacity-40 text-white px-2 py-1 rounded"
+                    className="text-xs bg-brand-purple/20 hover:bg-brand-purple/30 disabled:opacity-40 text-brand-purple px-2 py-1 rounded"
                     title="Re-index"
                   >
                     ↻
@@ -248,7 +246,7 @@ export default function Settings({ indexing }) {
                   <button
                     onClick={() => deleteChannel(ch.id)}
                     disabled={isIndexing}
-                    className="text-xs bg-red-800 hover:bg-red-700 disabled:opacity-40 text-white px-2 py-1 rounded"
+                    className="text-xs bg-brand-pink/15 hover:bg-brand-pink/25 disabled:opacity-40 text-brand-pink px-2 py-1 rounded"
                   >
                     ✕
                   </button>
@@ -258,10 +256,9 @@ export default function Settings({ indexing }) {
           </ul>
         )}
         {channels.length === 0 && !isIndexing && (
-          <p className="text-gray-500 text-xs">No channels added yet</p>
+          <p className="text-brand-dim/40 text-xs font-mono">No channels added yet</p>
         )}
 
-        {/* Add channel */}
         <Field label="Add channel" hint="YouTube channel URL or handle (e.g. @channelname)">
           <div className="flex gap-2 mt-1">
             <input
@@ -271,33 +268,33 @@ export default function Settings({ indexing }) {
               onKeyDown={(e) => e.key === 'Enter' && addChannel()}
               placeholder="https://youtube.com/@..."
               disabled={isIndexing}
-              className="flex-1 bg-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-40"
+              className={`flex-1 disabled:opacity-40 ${inputCls}`}
             />
             <button
               onClick={addChannel}
               disabled={addingChannel || isIndexing || !channelUrl.trim()}
-              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+              className="bg-brand-purple hover:bg-brand-purple/80 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors"
             >
               {addingChannel ? '...' : 'Add'}
             </button>
           </div>
-          {channelError && <p className="text-red-400 text-xs mt-1">{channelError}</p>}
+          {channelError && <p className="text-brand-pink text-xs mt-1 font-mono">{channelError}</p>}
         </Field>
       </div>
 
       {/* General settings */}
-      <div className="bg-gray-800 rounded-xl p-4 space-y-4">
-        <p className="text-gray-400 text-xs uppercase tracking-widest">General</p>
+      <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
+        <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">General</p>
         <Field
           label="Background music URL"
-          hint="YouTube video or playlist to play between songs (idle/between modes)"
+          hint="YouTube video or playlist to play between songs"
         >
           <input
             type="text"
             value={bgMusicUrl}
             onChange={(e) => setBgMusicUrl(e.target.value)}
             placeholder="https://youtube.com/playlist?list=..."
-            className="w-full bg-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className={`w-full ${inputCls}`}
           />
         </Field>
         <Field label="Countdown duration (seconds)">
@@ -307,38 +304,38 @@ export default function Settings({ indexing }) {
             max="60"
             value={countdown}
             onChange={(e) => setCountdown(e.target.value)}
-            className="w-24 bg-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className={`w-24 ${inputCls}`}
           />
         </Field>
         <Field
           label="Local media folder"
-          hint="Path to folder containing .mp3/.cdg pairs or .mkv/.mp4 files"
+          hint="Path to folder with .mp3/.cdg pairs or .mkv/.mp4 files"
         >
           <input
             type="text"
             value={localPath}
             onChange={(e) => setLocalPath(e.target.value)}
             placeholder="C:\karaoke\files"
-            className="w-full bg-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className={`w-full ${inputCls}`}
           />
         </Field>
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={saveGeneralSettings}
             disabled={saving}
-            className="bg-gray-600 hover:bg-gray-500 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+            className="bg-white/10 hover:bg-white/15 disabled:opacity-50 text-brand-dim text-sm px-4 py-2 rounded-lg transition-colors"
           >
             Save settings
           </button>
           <button
             onClick={scanLocal}
             disabled={scanning || !localPath.trim()}
-            className="bg-blue-700 hover:bg-blue-600 disabled:opacity-40 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+            className="bg-brand-purple/20 hover:bg-brand-purple/30 disabled:opacity-40 text-brand-purple text-sm px-4 py-2 rounded-lg transition-colors"
           >
             {scanning ? 'Scanning...' : 'Scan local files'}
           </button>
           {scanResult !== null && (
-            <span className="text-xs text-green-400">
+            <span className="text-xs text-green-400 font-mono">
               {typeof scanResult === 'number' ? `Found ${scanResult} files` : scanResult}
             </span>
           )}

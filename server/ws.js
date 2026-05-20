@@ -28,10 +28,12 @@ let appState = {
     source: 'youtube',
   },
   player_command: null,
+  playback_position: { elapsed_seconds: 0, duration_seconds: 0 },
   indexing: {
     active: false,
     channel_name: null,
     processed: 0,
+    skipped: 0,
     total: null,
     error: null,
   },

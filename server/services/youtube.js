@@ -107,7 +107,7 @@ async function* fetchChannelVideos(channelId, apiKey) {
     const videoIds = items.map((i) => i.snippet.resourceId.videoId).join(',');
     const details = await ytFetch('videos', {
       id: videoIds,
-      part: 'contentDetails,snippet',
+      part: 'contentDetails,snippet,status',
       key: apiKey,
     });
     const detailMap = Object.fromEntries((details.items || []).map((v) => [v.id, v]));
@@ -131,6 +131,7 @@ async function* fetchChannelVideos(channelId, apiKey) {
         channel_id: channelId,
         duration_seconds: parseISO8601(d.contentDetails?.duration),
         thumbnail_url: thumb,
+        embeddable: d.status?.embeddable !== false,
       };
     }
 

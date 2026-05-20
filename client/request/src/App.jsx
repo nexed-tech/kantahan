@@ -1,24 +1,26 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWebSocket } from '../../shared/useWebSocket';
+import logoUrl from './assets/logo-marquee-primary-animated.svg';
 
 const NAME_KEY = 'kantahan_singer_name';
 
-function SearchResult({ song, onSelect }) {
+function SongRow({ song, onSelect }) {
   return (
     <button
       onClick={() => onSelect(song)}
-      className="w-full flex items-center gap-3 p-3 rounded-xl bg-gray-800 hover:bg-gray-700 active:bg-gray-600 transition-colors text-left"
+      className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 active:bg-white/15 transition-colors text-left border border-white/5 active:border-brand-purple/30"
+      style={{ minHeight: 64 }}
     >
       {song.thumbnail_url ? (
         <img src={song.thumbnail_url} alt="" className="w-12 h-9 object-cover rounded shrink-0" />
       ) : (
-        <div className="w-12 h-9 bg-gray-700 rounded flex items-center justify-center text-gray-500 text-sm shrink-0">
-          🎵
+        <div className="w-12 h-9 bg-white/10 rounded flex items-center justify-center text-brand-dim text-sm shrink-0">
+          ♪
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-white text-sm font-medium truncate">{song.title}</p>
-        <p className="text-gray-400 text-xs truncate">
+        <p className="text-brand-ink text-sm font-medium truncate">{song.title}</p>
+        <p className="text-brand-dim text-xs truncate">
           {song.artist || song.channel_name || song.source}
         </p>
       </div>
@@ -29,34 +31,34 @@ function SearchResult({ song, onSelect }) {
 function ConfirmDialog({ song, singerName, onConfirm, onCancel, submitting, success, submittedData }) {
   if (success) {
     return (
-      <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-6 z-50">
-        <div className="bg-gray-800 rounded-2xl p-8 text-center space-y-4 max-w-sm w-full shadow-2xl">
+      <div className="fixed inset-0 bg-brand-bg/90 flex items-center justify-center p-6 z-50">
+        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 text-center space-y-4 max-w-sm w-full shadow-2xl border border-white/10">
           <div className="text-5xl">🎤</div>
-          <h2 className="text-white text-xl font-bold">Request sent!</h2>
-          <p className="text-gray-300 text-sm">
-            <span className="font-semibold">{singerName}</span>
-            <span className="text-gray-500"> — </span>
+          <h2 className="text-brand-ink text-xl font-bold">Request sent!</h2>
+          <p className="text-brand-dim text-sm">
+            <span className="font-semibold text-brand-ink">{singerName}</span>
+            <span className="text-brand-dim/50"> — </span>
             {song.title}
           </p>
 
           {submittedData?.queued && submittedData?.queue_position != null && (
-            <div className="bg-purple-900/50 border border-purple-700/50 rounded-xl px-4 py-3">
-              <p className="text-purple-200 text-2xl font-bold">
+            <div className="bg-brand-purple/20 border border-brand-purple/40 rounded-xl px-4 py-3">
+              <p className="text-brand-ink text-2xl font-bold font-mono">
                 #{submittedData.queue_position}
               </p>
-              <p className="text-purple-400 text-sm">in the queue</p>
+              <p className="text-brand-dim text-sm">in the queue</p>
             </div>
           )}
 
           {!submittedData?.queued && (
-            <p className="text-gray-400 text-sm bg-gray-700/50 rounded-xl px-4 py-3">
+            <p className="text-brand-dim text-sm bg-white/5 rounded-xl px-4 py-3 border border-white/10">
               The DJ will review your request
             </p>
           )}
 
           <button
             onClick={onCancel}
-            className="w-full bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white py-3 rounded-xl font-medium transition-colors"
+            className="w-full bg-brand-purple hover:bg-brand-purple/80 active:bg-brand-purple/60 text-white py-3 rounded-xl font-medium transition-colors"
           >
             Done
           </button>
@@ -66,31 +68,31 @@ function ConfirmDialog({ song, singerName, onConfirm, onCancel, submitting, succ
   }
 
   return (
-    <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-6 z-50">
-      <div className="bg-gray-800 rounded-2xl p-6 space-y-5 max-w-sm w-full shadow-2xl">
-        <h2 className="text-white text-lg font-bold">Confirm request</h2>
-        <div className="bg-gray-700 rounded-xl p-4 space-y-3">
+    <div className="fixed inset-0 bg-brand-bg/90 flex items-center justify-center p-6 z-50">
+      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 space-y-5 max-w-sm w-full shadow-2xl border border-white/10">
+        <h2 className="text-brand-ink text-lg font-bold">Confirm request</h2>
+        <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-white/10">
           <div>
-            <p className="text-xs text-gray-400 mb-0.5">Singer</p>
-            <p className="text-white font-semibold">{singerName}</p>
+            <p className="text-xs text-brand-dim font-mono mb-0.5">Singer</p>
+            <p className="text-brand-ink font-semibold">{singerName}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400 mb-0.5">Song</p>
-            <p className="text-white">{song.title}</p>
-            {song.artist && <p className="text-gray-400 text-sm">{song.artist}</p>}
+            <p className="text-xs text-brand-dim font-mono mb-0.5">Song</p>
+            <p className="text-brand-ink">{song.title}</p>
+            {song.artist && <p className="text-brand-dim text-sm">{song.artist}</p>}
           </div>
         </div>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl transition-colors"
+            className="flex-1 bg-white/10 hover:bg-white/15 text-brand-dim py-3 rounded-xl transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={submitting}
-            className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition-colors"
+            className="flex-1 bg-brand-purple hover:bg-brand-purple/80 disabled:opacity-50 text-white py-3 rounded-xl font-semibold transition-colors"
           >
             {submitting ? 'Sending...' : 'Send request'}
           </button>
@@ -104,32 +106,52 @@ export default function App() {
   const { state } = useWebSocket();
   const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) || '');
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
+  const [randomSongs, setRandomSongs] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [submittedData, setSubmittedData] = useState(null);
+  const [listVisible, setListVisible] = useState(true);
   const debounceRef = useRef(null);
+
+  // Load random songs on mount
+  useEffect(() => {
+    fetch('/api/library/random?limit=25')
+      .then((r) => r.json())
+      .then(setRandomSongs)
+      .catch(() => {});
+  }, []);
 
   function saveName(value) {
     setName(value);
     localStorage.setItem(NAME_KEY, value);
   }
 
+  // Search with crossfade effect
   useEffect(() => {
     clearTimeout(debounceRef.current);
+
     if (query.trim().length < 2) {
-      setResults([]);
+      // Fade out, switch to random, fade in
+      if (searchResults.length > 0) {
+        setListVisible(false);
+        setTimeout(() => { setSearchResults([]); setListVisible(true); }, 150);
+      }
       return;
     }
+
     debounceRef.current = setTimeout(async () => {
+      setListVisible(false);
       setSearching(true);
       try {
         const res = await fetch(`/api/library/search?q=${encodeURIComponent(query)}`);
-        setResults(await res.json());
+        const data = await res.json();
+        setSearchResults(data);
       } finally {
         setSearching(false);
+        setListVisible(true);
       }
     }, 300);
   }, [query]);
@@ -156,13 +178,17 @@ export default function App() {
     setSuccess(false);
     setSubmittedData(null);
     setQuery('');
-    setResults([]);
+    setSearchResults([]);
+    setListVisible(true);
   }
 
+  const isSearching = query.trim().length >= 2;
+  const displayList = isSearching ? searchResults : randomSongs;
+  const listLabel = isSearching ? 'Results' : 'Suggested songs';
   const queue = state?.queue || [];
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white pb-10">
+    <div className="min-h-screen bg-brand-bg text-brand-ink pb-10">
       {selected && (
         <ConfirmDialog
           song={selected}
@@ -175,77 +201,89 @@ export default function App() {
         />
       )}
 
-      <div className="max-w-lg mx-auto px-4 pt-8 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Request a song</h1>
-          <p className="text-gray-400 text-sm mt-1">Search and submit — we'll call you up</p>
+      <div className="max-w-lg mx-auto px-4 pt-6 space-y-5">
+        {/* Logo header */}
+        <div className="flex justify-center pt-2">
+          <img src={logoUrl} alt="Kantahan" style={{ width: 180, height: 'auto' }} />
         </div>
 
-        {/* Step 7: Name field — persisted to localStorage */}
+        {/* Name field */}
         <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">Your name</label>
+          <label className="text-xs text-brand-dim font-mono uppercase tracking-widest mb-2 block">Your name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => saveName(e.target.value)}
             placeholder="Enter your name"
-            className="w-full bg-gray-800 text-white text-base rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full bg-white/5 text-brand-ink text-base rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-purple border border-white/10 focus:border-brand-purple/50 placeholder:text-brand-dim/30 transition-colors"
           />
         </div>
 
         {/* Search */}
         <div>
-          <label className="text-sm text-gray-400 mb-1.5 block">Search for a song</label>
+          <label className="text-xs text-brand-dim font-mono uppercase tracking-widest mb-2 block">Search for a song</label>
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Song title or artist..."
             disabled={!name.trim()}
-            className="w-full bg-gray-800 text-white text-base rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-40"
+            className="w-full bg-white/5 text-brand-ink text-base rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-purple border border-white/10 focus:border-brand-purple/50 placeholder:text-brand-dim/30 disabled:opacity-40 transition-colors"
           />
           {!name.trim() && (
-            <p className="text-gray-600 text-xs mt-1.5">Enter your name first</p>
+            <p className="text-brand-dim/40 text-xs mt-1.5 font-mono">Enter your name first</p>
           )}
         </div>
 
-        {/* Results */}
-        {searching && (
-          <p className="text-gray-500 text-sm text-center py-4">Searching...</p>
-        )}
-        {!searching && query.trim().length >= 2 && results.length === 0 && (
-          <div className="text-center py-6">
-            <p className="text-gray-500 text-sm">No songs found for "{query}"</p>
-            <p className="text-gray-600 text-xs mt-1">
-              The library may still be empty — ask the DJ to index some channels
-            </p>
+        {/* Song list — random or search results */}
+        {name.trim() && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-brand-dim/60 font-mono uppercase tracking-widest">
+                {listLabel}
+              </p>
+              {searching && (
+                <p className="text-brand-dim/50 text-xs font-mono">Searching...</p>
+              )}
+            </div>
+
+            {isSearching && !searching && searchResults.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-brand-dim/60 text-sm">No songs found for "{query}"</p>
+                <p className="text-brand-dim/40 text-xs mt-1 font-mono">
+                  Ask the DJ to index some channels
+                </p>
+              </div>
+            ) : (
+              <ul
+                className="space-y-2 transition-opacity duration-150"
+                style={{ opacity: listVisible ? 1 : 0 }}
+              >
+                {displayList.map((song) => (
+                  <li key={song.id}>
+                    <SongRow song={song} onSelect={setSelected} />
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        )}
-        {results.length > 0 && (
-          <ul className="space-y-2">
-            {results.map((song) => (
-              <li key={song.id}>
-                <SearchResult song={song} onSelect={setSelected} />
-              </li>
-            ))}
-          </ul>
         )}
 
         {/* Queue preview */}
         {queue.length > 0 && (
-          <div className="pt-4 border-t border-gray-800">
-            <p className="text-xs text-gray-500 uppercase tracking-widest mb-3">
+          <div className="pt-4 border-t border-white/10">
+            <p className="text-xs text-brand-dim/50 font-mono uppercase tracking-widest mb-3">
               {queue.length} in queue
             </p>
             <ul className="space-y-1.5">
               {queue.slice(0, 6).map((item) => (
                 <li key={item.id} className="flex justify-between text-sm gap-4">
-                  <span className="text-gray-300 shrink-0">{item.singer}</span>
-                  <span className="text-gray-500 truncate text-right">{item.song.title}</span>
+                  <span className="text-brand-dim shrink-0">{item.singer}</span>
+                  <span className="text-brand-dim/40 truncate text-right">{item.song.title}</span>
                 </li>
               ))}
               {queue.length > 6 && (
-                <li className="text-gray-600 text-xs">+{queue.length - 6} more</li>
+                <li className="text-brand-dim/40 text-xs font-mono">+{queue.length - 6} more</li>
               )}
             </ul>
           </div>

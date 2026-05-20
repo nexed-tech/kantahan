@@ -331,7 +331,7 @@ POST /api/queue/add-direct
 
 **Problem:** The server auto-detects the local IP via `os.networkInterfaces()` but picks up whichever interface comes first — this grabbed the Tailscale IP (100.x.x.x range) instead of the LAN IP. IP addresses also change with DHCP, making QR codes stale.
 
-**Fix:** Use mDNS (Bonjour) as the default so the app is reachable at `http://ktv.local:3000` regardless of IP. Keep a manual `host_url` override for edge cases.
+**Fix:** Use mDNS (Bonjour) as the default so the app is reachable at `http://kantahan.local:3000` regardless of IP. Keep a manual `host_url` override for edge cases.
 
 ### mDNS (default)
 
@@ -434,7 +434,7 @@ The React clients are pre-built and served as static files — add a build step 
 
 ```yaml
 services:
-  ktv:
+  kantahan:
     build: .
     ports:
       - "3000:3000"

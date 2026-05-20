@@ -57,6 +57,11 @@ db.exec(`
   );
 `);
 
+// Column migrations — wrapped in try/catch since ADD COLUMN fails if column exists
+try { db.exec('ALTER TABLE songs ADD COLUMN embeddable INTEGER DEFAULT 1'); } catch {}
+try { db.exec('ALTER TABLE songs ADD COLUMN zip_mp3_entry TEXT'); } catch {}
+try { db.exec('ALTER TABLE songs ADD COLUMN zip_cdg_entry TEXT'); } catch {}
+
 const defaultSettings = {
   auto_approve: 'false',
   singer_rotation: 'true',

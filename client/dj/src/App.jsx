@@ -2,20 +2,29 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useWebSocket } from '../../shared/useWebSocket';
 import Settings from './components/Settings';
 import RequestsInbox from './components/RequestsInbox';
+import Library from './components/Library';
+import logoUrl from './assets/logo-marquee-primary-animated.svg';
 
-const TABS = ['queue', 'requests', 'settings'];
+const TABS = ['queue', 'requests', 'library', 'settings'];
+
+function fmt(secs) {
+  const s = Math.max(0, Math.floor(secs));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
 
 function Tab({ label, active, badge, onClick }) {
   return (
     <button
       onClick={onClick}
       className={`relative px-4 py-2 text-sm font-medium rounded-t transition-colors ${
-        active ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'
+        active
+          ? 'bg-white/10 text-brand-ink'
+          : 'text-brand-dim hover:text-brand-ink'
       }`}
     >
       {label}
       {badge > 0 && (
-        <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-brand-pink text-white text-xs rounded-full flex items-center justify-center">
           {badge > 9 ? '9+' : badge}
         </span>
       )}
@@ -26,12 +35,12 @@ function Tab({ label, active, badge, onClick }) {
 function Toggle({ label, value, onChange }) {
   return (
     <label className="flex items-center justify-between gap-4 py-2 cursor-pointer">
-      <span className="text-sm text-gray-300">{label}</span>
+      <span className="text-sm text-brand-dim">{label}</span>
       <button
         type="button"
         onClick={() => onChange(!value)}
         className={`relative w-10 h-6 rounded-full transition-colors ${
-          value ? 'bg-purple-600' : 'bg-gray-600'
+          value ? 'bg-brand-purple' : 'bg-white/15'
         }`}
       >
         <span
@@ -48,27 +57,33 @@ function NowPlayingSection({ state, onPlay, onPause, onSkip }) {
   const mode = state?.mode;
   const nowPlaying = state?.now_playing;
   const countdown = state?.countdown;
+  const pos = state?.playback_position;
+  const elapsed = pos?.elapsed_seconds || 0;
+  const duration = pos?.duration_seconds || 0;
+  const progress = duration > 0 ? Math.min(elapsed / duration, 1) : 0;
+  const remaining = Math.max(duration - elapsed, 0);
 
   if (mode === 'between') {
     const waiting = !countdown?.active || countdown.seconds_remaining === 0;
     return (
-      <div className="bg-gray-800 rounded-xl p-4 space-y-3 border border-purple-700/40">
+      <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-brand-purple/30">
         <div>
-          <p className="text-xs text-purple-300 uppercase tracking-widest">Up next</p>
-          <p className="text-white font-semibold mt-1 text-lg">
+          <p className="text-xs text-brand-purple font-mono uppercase tracking-widest">Up next</p>
+          <p className="text-brand-ink font-semibold mt-1 text-lg">
             {countdown?.next_song?.title || '—'}
           </p>
-          <p className="text-gray-400 text-sm">{countdown?.next_singer}</p>
+          <p className="text-brand-dim text-sm">{countdown?.next_singer}</p>
         </div>
 
         {waiting ? (
-          <p className="text-gray-500 text-sm">Countdown paused — waiting for manual start</p>
+          <p className="text-brand-dim/60 text-sm font-mono">Countdown paused — waiting for manual start</p>
         ) : (
           <div className="flex items-center gap-3">
-            <span className="text-yellow-400 text-4xl font-mono font-bold tabular-nums">
+            <span className="text-brand-amber text-4xl font-mono font-bold tabular-nums"
+                  style={{ textShadow: '0 0 20px #ffb627' }}>
               {countdown.seconds_remaining}s
             </span>
-            <span className="text-gray-500 text-sm">auto-starting...</span>
+            <span className="text-brand-dim/60 text-sm font-mono">auto-starting...</span>
           </div>
         )}
 
@@ -81,7 +96,7 @@ function NowPlayingSection({ state, onPlay, onPause, onSkip }) {
           </button>
           <button
             onClick={onSkip}
-            className="bg-red-800 hover:bg-red-700 active:bg-red-900 text-white text-sm px-4 py-3 rounded-lg transition-colors"
+            className="bg-brand-pink/20 hover:bg-brand-pink/30 text-brand-pink text-sm px-4 py-3 rounded-lg transition-colors"
           >
             Skip
           </button>
@@ -93,14 +108,14 @@ function NowPlayingSection({ state, onPlay, onPause, onSkip }) {
   if (mode !== 'playing' || !nowPlaying) {
     const queue = state?.queue || [];
     return (
-      <div className="bg-gray-800 rounded-xl p-4 space-y-3">
-        <p className="text-gray-500 text-sm">No song playing</p>
+      <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-white/10">
+        <p className="text-brand-dim/60 text-sm font-mono">No song playing</p>
         {queue.length > 0 && (
           <>
-            <p className="text-gray-400 text-xs">
-              Next up: <span className="text-white">{queue[0].song.title}</span>
-              <span className="text-gray-500"> — {queue[0].singer}</span>
-              {queue.length > 1 && <span className="text-gray-600"> (+{queue.length - 1} more)</span>}
+            <p className="text-brand-dim text-xs">
+              Next up: <span className="text-brand-ink">{queue[0].song.title}</span>
+              <span className="text-brand-dim/50"> — {queue[0].singer}</span>
+              {queue.length > 1 && <span className="text-brand-dim/40"> (+{queue.length - 1} more)</span>}
             </p>
             <div className="flex gap-2">
               <button
@@ -111,7 +126,7 @@ function NowPlayingSection({ state, onPlay, onPause, onSkip }) {
               </button>
               <button
                 onClick={onSkip}
-                className="bg-gray-700 hover:bg-gray-600 text-white text-sm px-4 py-2.5 rounded-lg transition-colors"
+                className="bg-white/10 hover:bg-white/15 text-brand-dim text-sm px-4 py-2.5 rounded-lg transition-colors"
               >
                 Skip
               </button>
@@ -123,28 +138,44 @@ function NowPlayingSection({ state, onPlay, onPause, onSkip }) {
   }
 
   return (
-    <div className="bg-gray-800 rounded-xl p-4 space-y-3">
+    <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-brand-pink/20">
       <div>
-        <p className="text-xs text-gray-400 uppercase tracking-widest">Now playing</p>
-        <p className="text-white font-semibold mt-1">{nowPlaying.song?.title || '—'}</p>
-        <p className="text-gray-400 text-sm">{nowPlaying.singer}</p>
+        <p className="text-xs text-brand-pink font-mono uppercase tracking-widest">Now playing</p>
+        <p className="text-brand-ink font-semibold mt-1">{nowPlaying.song?.title || '—'}</p>
+        <p className="text-brand-dim text-sm">{nowPlaying.singer}</p>
       </div>
+
+      {duration > 0 && (
+        <div className="space-y-1">
+          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-brand-pink rounded-full transition-all duration-1000"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
+          <div className="flex justify-between text-xs text-brand-dim/60 font-mono tabular-nums">
+            <span>{fmt(elapsed)}</span>
+            <span>-{fmt(remaining)}</span>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <button
           onClick={onPlay}
-          className="flex-1 bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white text-sm py-2 rounded-lg transition-colors"
+          className="flex-1 bg-brand-purple/80 hover:bg-brand-purple active:bg-brand-purple/60 text-white text-sm py-2 rounded-lg transition-colors"
         >
           ▶ Play
         </button>
         <button
           onClick={onPause}
-          className="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 rounded-lg transition-colors"
+          className="flex-1 bg-white/10 hover:bg-white/15 text-brand-dim text-sm py-2 rounded-lg transition-colors"
         >
           ⏸ Pause
         </button>
         <button
           onClick={onSkip}
-          className="flex-1 bg-red-700 hover:bg-red-600 text-white text-sm py-2 rounded-lg transition-colors"
+          className="flex-1 bg-brand-pink/20 hover:bg-brand-pink/30 text-brand-pink text-sm py-2 rounded-lg transition-colors"
         >
           ⏭ Skip
         </button>
@@ -173,19 +204,19 @@ function BgMusicCard({ bgm }) {
   }
 
   return (
-    <div className="bg-gray-800 rounded-xl px-4 py-3 space-y-2">
+    <div className="bg-white/5 rounded-xl px-4 py-3 space-y-2 border border-white/10">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-300 font-medium">Background Music</p>
+          <p className="text-sm text-brand-dim font-medium">Background Music</p>
           {!url && (
-            <p className="text-gray-600 text-xs mt-0.5">Set a YouTube URL in Settings</p>
+            <p className="text-brand-dim/40 text-xs mt-0.5 font-mono">Set a YouTube URL in Settings</p>
           )}
         </div>
         <button
           onClick={toggle}
           disabled={!url}
           className={`relative w-10 h-6 rounded-full transition-colors disabled:opacity-30 ${
-            playing && url ? 'bg-purple-600' : 'bg-gray-600'
+            playing && url ? 'bg-brand-purple' : 'bg-white/15'
           }`}
         >
           <span
@@ -197,7 +228,7 @@ function BgMusicCard({ bgm }) {
       </div>
       {url && (
         <div className="flex items-center gap-3">
-          <span className="text-gray-500 text-xs">🔈</span>
+          <span className="text-brand-dim/60 text-xs">🔈</span>
           <input
             type="range"
             min="0"
@@ -207,9 +238,9 @@ function BgMusicCard({ bgm }) {
             onChange={(e) => setLocalVol(parseFloat(e.target.value))}
             onMouseUp={(e) => commitVolume(parseFloat(e.target.value))}
             onTouchEnd={(e) => commitVolume(parseFloat(e.target.value))}
-            className="flex-1 accent-purple-500"
+            className="flex-1 accent-brand-purple"
           />
-          <span className="text-gray-400 text-xs w-8 text-right">
+          <span className="text-brand-dim/60 text-xs w-8 text-right font-mono">
             {Math.round(localVol * 100)}%
           </span>
         </div>
@@ -224,19 +255,14 @@ function QueueTab({ queue, onRemove, onBump, onReorder }) {
 
   if (queue.length === 0) {
     return (
-      <div className="flex items-center justify-center h-40 text-gray-500 text-sm">
+      <div className="flex items-center justify-center h-40 text-brand-dim/50 text-sm font-mono">
         Queue is empty
       </div>
     );
   }
 
-  function handleDragStart(idx) {
-    dragItem.current = idx;
-  }
-
-  function handleDragEnter(idx) {
-    dragOverItem.current = idx;
-  }
+  function handleDragStart(idx) { dragItem.current = idx; }
+  function handleDragEnter(idx) { dragOverItem.current = idx; }
 
   function handleDragEnd() {
     if (dragItem.current === null || dragItem.current === dragOverItem.current) {
@@ -262,28 +288,28 @@ function QueueTab({ queue, onRemove, onBump, onReorder }) {
           onDragEnter={() => handleDragEnter(idx)}
           onDragEnd={handleDragEnd}
           onDragOver={(e) => e.preventDefault()}
-          className="bg-gray-800 rounded-lg px-4 py-3 flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing active:opacity-50 select-none"
+          className="bg-white/5 rounded-lg px-4 py-3 flex items-center justify-between gap-3 cursor-grab active:cursor-grabbing active:opacity-50 select-none border border-white/5 hover:border-brand-purple/30 transition-colors"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-gray-600 text-base shrink-0">⠿</span>
-            <span className="text-gray-500 text-sm w-5 shrink-0 tabular-nums">
+            <span className="text-brand-dim/40 text-base shrink-0">⠿</span>
+            <span className="text-brand-dim/50 text-sm w-5 shrink-0 tabular-nums font-mono">
               {item.position}
             </span>
             <div className="min-w-0">
-              <p className="text-white text-sm font-medium truncate">{item.song.title}</p>
-              <p className="text-gray-400 text-xs">{item.singer}</p>
+              <p className="text-brand-ink text-sm font-medium truncate">{item.song.title}</p>
+              <p className="text-brand-dim text-xs">{item.singer}</p>
             </div>
           </div>
           <div className="flex gap-1 shrink-0">
             <button
               onClick={() => onBump(item.id)}
-              className="text-xs bg-yellow-700 hover:bg-yellow-600 text-white px-2 py-1 rounded"
+              className="text-xs bg-brand-amber/20 hover:bg-brand-amber/30 text-brand-amber px-2 py-1 rounded"
             >
               Next
             </button>
             <button
               onClick={() => onRemove(item.id)}
-              className="text-xs bg-red-800 hover:bg-red-700 text-white px-2 py-1 rounded"
+              className="text-xs bg-brand-pink/15 hover:bg-brand-pink/25 text-brand-pink px-2 py-1 rounded"
             >
               ✕
             </button>
@@ -311,22 +337,12 @@ export default function App() {
     });
   }
 
-  async function handlePlay() {
-    await apiFetch('/api/playback/play', { method: 'POST' });
-  }
-  async function handlePause() {
-    await apiFetch('/api/playback/pause', { method: 'POST' });
-  }
-  async function handleSkip() {
-    await apiFetch('/api/playback/skip', { method: 'POST' });
-  }
+  async function handlePlay() { await apiFetch('/api/playback/play', { method: 'POST' }); }
+  async function handlePause() { await apiFetch('/api/playback/pause', { method: 'POST' }); }
+  async function handleSkip() { await apiFetch('/api/playback/skip', { method: 'POST' }); }
 
-  async function handleRemove(id) {
-    await apiFetch(`/api/queue/${id}`, { method: 'DELETE' });
-  }
-  async function handleBump(id) {
-    await apiFetch(`/api/queue/${id}/bump`, { method: 'POST' });
-  }
+  async function handleRemove(id) { await apiFetch(`/api/queue/${id}`, { method: 'DELETE' }); }
+  async function handleBump(id) { await apiFetch(`/api/queue/${id}/bump`, { method: 'POST' }); }
   async function handleReorder(ids) {
     await apiFetch('/api/queue/reorder', {
       method: 'PUT',
@@ -334,12 +350,8 @@ export default function App() {
     });
   }
 
-  async function handleApprove(id) {
-    await apiFetch(`/api/requests/${id}/approve`, { method: 'POST' });
-  }
-  async function handleReject(id) {
-    await apiFetch(`/api/requests/${id}/reject`, { method: 'POST' });
-  }
+  async function handleApprove(id) { await apiFetch(`/api/requests/${id}/approve`, { method: 'POST' }); }
+  async function handleReject(id) { await apiFetch(`/api/requests/${id}/reject`, { method: 'POST' }); }
   async function handleEditRequest(id, singerName) {
     await apiFetch(`/api/requests/${id}`, {
       method: 'PUT',
@@ -350,16 +362,17 @@ export default function App() {
   const settings = state?.settings || {};
   const requestsBadge = state?.requests_pending || 0;
   const requests = state?.requests || [];
+  const modeLabel = state?.mode || '—';
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <h1 className="font-bold text-lg">Kantahan DJ</h1>
+    <div className="min-h-screen bg-brand-bg text-brand-ink flex flex-col">
+      <header className="bg-black/40 border-b border-white/10 px-4 py-3 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
+        <img src={logoUrl} alt="Kantahan" style={{ width: 140, height: 'auto' }} />
         <div className="flex items-center gap-2 text-sm">
           <span
             className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500'}`}
           />
-          <span className="text-gray-400 capitalize">{state?.mode || '—'}</span>
+          <span className="text-brand-dim font-mono capitalize">{modeLabel}</span>
         </div>
       </header>
 
@@ -371,7 +384,7 @@ export default function App() {
           onSkip={handleSkip}
         />
 
-        <div className="bg-gray-800 rounded-xl px-4 divide-y divide-gray-700">
+        <div className="bg-white/5 rounded-xl px-4 divide-y divide-white/10 border border-white/10">
           <Toggle
             label="Auto Approve requests"
             value={settings.auto_approve === true}
@@ -397,7 +410,7 @@ export default function App() {
         <BgMusicCard bgm={state?.background_music} />
 
         <div>
-          <div className="flex gap-1 border-b border-gray-700 mb-3">
+          <div className="flex gap-1 border-b border-white/10 mb-3">
             {TABS.map((tab) => (
               <Tab
                 key={tab}
@@ -425,6 +438,7 @@ export default function App() {
               onEditName={handleEditRequest}
             />
           )}
+          {activeTab === 'library' && <Library />}
           {activeTab === 'settings' && <Settings indexing={state?.indexing} />}
         </div>
       </div>

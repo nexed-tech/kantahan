@@ -13,6 +13,15 @@ router.post('/', (req, res) => {
   res.json(addToQueue(song_id, singer_name));
 });
 
+router.post('/add-direct', (req, res) => {
+  const { song_id, singer_name } = req.body;
+  if (!song_id || !singer_name)
+    return res.status(400).json({ error: 'song_id and singer_name required' });
+  const song = db.prepare('SELECT id FROM songs WHERE id = ?').get(song_id);
+  if (!song) return res.status(404).json({ error: 'Song not found' });
+  res.json(addToQueue(song_id, singer_name));
+});
+
 router.delete('/:id', (req, res) => {
   db.prepare("UPDATE queue SET status = 'skipped' WHERE id = ?").run(req.params.id);
   syncQueue();
