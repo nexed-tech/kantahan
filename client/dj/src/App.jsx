@@ -6,6 +6,15 @@ import Library from './components/Library';
 import PinOverlay from './components/PinOverlay';
 import logoUrl from './assets/logo-marquee-primary-animated.svg';
 
+const KOFI_LABELS = [
+  'Buy me a Red Horse',
+  'Buy me a Coffee',
+  'Support the project',
+  'Keep karaoke free',
+  'Buy the DJ a round',
+  'Keep the mic on',
+];
+
 const QUICK_MESSAGES = [
   'Get a drink! 🍺',
   'Request a song! 📱',
@@ -40,6 +49,15 @@ function Toggle({ label, value, onChange, disabled }) {
         />
       </button>
     </label>
+  );
+}
+
+function BeerBottle({ className }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M13.5 2h-3a.5.5 0 0 0-.5.5v2.64a4 4 0 0 0-1.5 3.1V19a3 3 0 0 0 3 3h1a3 3 0 0 0 3-3V8.24a4 4 0 0 0-1.5-3.1V2.5a.5.5 0 0 0-.5-.5z" />
+      <rect x="9.5" y="1" width="5" height="1.25" rx="0.5" />
+    </svg>
   );
 }
 
@@ -396,8 +414,21 @@ export default function App() {
   const bgHasSource = bgm?.source === 'local' ? !!bgm?.local_path : !!bgm?.url;
   const [bgVol, setBgVol] = useState(0.4);
   const [pinUnlocked, setPinUnlocked] = useState(null); // null = loading
+  const [kofiIdx, setKofiIdx] = useState(0);
+  const [kofiVisible, setKofiVisible] = useState(true);
 
   useEffect(() => { setBgVol(bgm?.volume ?? 0.4); }, [bgm?.volume]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setKofiVisible(false);
+      setTimeout(() => {
+        setKofiIdx((i) => (i + 1) % KOFI_LABELS.length);
+        setKofiVisible(true);
+      }, 300);
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   async function handleBgToggle() {
     await apiFetch(`/api/bgmusic/${bgm?.playing ? 'pause' : 'play'}`, { method: 'POST' });
@@ -415,6 +446,17 @@ export default function App() {
       <header className="bg-black/40 border-b border-white/10 px-4 py-3 flex items-center justify-between shrink-0 z-10 backdrop-blur-sm">
         <img src={logoUrl} alt="Kantahan" style={{ width: 140, height: 'auto' }} />
         <div className="flex items-center gap-3 text-sm">
+          <a
+            href="https://ko-fi.com/stephancraane"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border border-brand-amber/20 text-brand-amber/40 hover:text-brand-amber hover:border-brand-amber/50 transition-colors"
+          >
+            <BeerBottle className="w-3.5 h-3.5 shrink-0" />
+            <span style={{ transition: 'opacity 0.3s', opacity: kofiVisible ? 1 : 0 }}>
+              {KOFI_LABELS[kofiIdx]}
+            </span>
+          </a>
           <div className="flex items-center gap-1.5" title={displayConnected ? 'Display connected' : 'No display connected'}>
             <span className={`w-2 h-2 rounded-full ${displayConnected ? 'bg-green-400' : 'bg-red-500'}`} />
             <span className="text-brand-dim/60 text-xs font-mono">display</span>

@@ -6,7 +6,8 @@ const ffprobeStatic = require('ffprobe-static');
 const AdmZip = require('adm-zip');
 const { parseSongTitle } = require('./youtube');
 
-ffmpeg.setFfprobePath(ffprobeStatic.path);
+// In a packaged Electron app the path is fixed by the main process via FFPROBE_PATH
+ffmpeg.setFfprobePath(process.env.FFPROBE_PATH || ffprobeStatic.path);
 
 function hashPath(filePath) {
   return crypto.createHash('sha256').update(filePath).digest('hex').slice(0, 16);

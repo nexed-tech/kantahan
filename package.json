@@ -12,7 +12,11 @@
     "dev": "concurrently -n srv,display,dj,req -c cyan,green,yellow,magenta \"cross-env NODE_OPTIONS=--experimental-sqlite nodemon server/index.js\" \"npm -w client/display run dev\" \"npm -w client/dj run dev\" \"npm -w client/request run dev\"",
     "build": "npm -w client/display run build && npm -w client/dj run build && npm -w client/request run build",
     "start": "cross-env NODE_ENV=production electron .",
-    "start:server": "cross-env NODE_ENV=production NODE_OPTIONS=--experimental-sqlite node server/index.js"
+    "start:server": "cross-env NODE_ENV=production NODE_OPTIONS=--experimental-sqlite node server/index.js",
+    "pack:win": "npm run build && electron-builder --win",
+    "pack:mac": "npm run build && electron-builder --mac",
+    "pack:linux": "npm run build && electron-builder --linux",
+    "pack": "npm run build && electron-builder --win --mac --linux"
   },
   "dependencies": {
     "adm-zip": "^0.5.17",
@@ -29,7 +33,40 @@
   "devDependencies": {
     "concurrently": "^8.2.2",
     "cross-env": "^7.0.3",
-    "electron": "^29.1.0",
+    "electron": "^34.0.0",
+    "electron-builder": "^24.0.0",
     "nodemon": "^3.0.3"
+  },
+  "build": {
+    "appId": "app.kantahan",
+    "productName": "Kantahan",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "server/**",
+      "node_modules/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/ffprobe-static/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.music",
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "AudioVideo",
+      "icon": "build/icon.png"
+    }
   }
 }
