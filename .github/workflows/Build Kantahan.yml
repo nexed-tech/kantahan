@@ -15,6 +15,8 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npm run pack:win
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
       - uses: actions/upload-artifact@v4
         with:
           name: Kantahan-Windows
@@ -30,6 +32,8 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npm run pack:mac
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
       - uses: actions/upload-artifact@v4
         with:
           name: Kantahan-macOS
@@ -46,6 +50,8 @@ jobs:
       - run: npm install
       - run: npm run build
       - run: npm run pack:linux
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
       - uses: actions/upload-artifact@v4
         with:
           name: Kantahan-Linux
