@@ -5,9 +5,10 @@ const path = require('path');
 const cors = require('cors');
 const os = require('os');
 const QRCode = require('qrcode');
+const { Bonjour } = require('bonjour-service');
 
 const { createWsServer, setState } = require('./ws');
-const { getAllSettings } = require('./db');
+const { getAllSettings, getSetting } = require('./db');
 
 const settingsRouter = require('./routes/api');
 const { router: queueRouter } = require('./routes/queue');
@@ -38,24 +39,48 @@ function getLocalIP() {
   const nets = os.networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) return net.address;
+      if (net.family !== 'IPv4' || net.internal) continue;
+      if (net.address.startsWith('100.')) continue; // Tailscale CGNAT range
+      if (net.address.startsWith('172.')) continue; // Docker bridge ranges
+      return net.address;
     }
   }
   return 'localhost';
 }
 
-app.get('/api/info', (_req, res) => {
-  const ip = getLocalIP();
+function getBaseUrl() {
+  const hostUrl = getSetting('host_url');
+  if (hostUrl && hostUrl.trim()) return hostUrl.trim();
+  const mdnsName = getSetting('mdns_name') || 'kantahan';
+  return `http://${mdnsName}.local:${PORT}`;
+}
+
+function buildUrls(base) {
   const dev = process.env.NODE_ENV !== 'production';
+  if (dev) {
+    const ip = getLocalIP();
+    return {
+      display: `http://${ip}:3001`,
+      dj:      `http://${ip}:3002`,
+      request: `http://${ip}:3003`,
+    };
+  }
+  return {
+    display: `${base}/display`,
+    dj:      `${base}/dj`,
+    request: `${base}/request`,
+  };
+}
+
+app.get('/api/info', (_req, res) => {
+  const base = getBaseUrl();
+  const ip   = getLocalIP();
   res.json({
     localIP: ip,
     port: PORT,
-    dev,
-    urls: {
-      display: dev ? `http://${ip}:3001`          : `http://${ip}:${PORT}/display`,
-      dj:      dev ? `http://${ip}:3002`          : `http://${ip}:${PORT}/dj`,
-      request: dev ? `http://${ip}:3003`          : `http://${ip}:${PORT}/request`,
-    },
+    dev: process.env.NODE_ENV !== 'production',
+    baseUrl: base,
+    urls: buildUrls(base),
   });
 });
 
@@ -70,6 +95,17 @@ app.get('/api/qr', async (req, res) => {
   } catch {
     res.status(500).send('QR generation failed');
   }
+});
+
+// PIN verification (client-side UX guard — not a security boundary)
+app.post('/api/auth/verify-pin', async (req, res) => {
+  const { pin } = req.body;
+  if (typeof pin !== 'string') return res.status(400).json({ ok: false });
+  const bcrypt = require('bcryptjs');
+  const hash = getSetting('dj_pin_hash');
+  if (!hash) return res.json({ ok: true }); // no PIN set — open access
+  const ok = await bcrypt.compare(pin, hash);
+  res.json({ ok });
 });
 
 if (process.env.NODE_ENV === 'production') {
@@ -91,6 +127,7 @@ setState({
     singer_rotation: dbSettings.singer_rotation === 'true',
     auto_play: dbSettings.auto_play === 'true',
     auto_queue: dbSettings.auto_queue === 'true',
+    auto_start: dbSettings.auto_start === 'true',
     countdown_seconds: parseInt(dbSettings.countdown_seconds) || 10,
   },
   background_music: {
@@ -98,14 +135,33 @@ setState({
     volume: parseFloat(dbSettings.background_music_volume || '0.4'),
     url: dbSettings.background_music_url || '',
     source: dbSettings.background_music_source || 'youtube',
+    local_path: dbSettings.background_music_local_path || '',
+  },
+  display_message: {
+    active: dbSettings.display_message_active === 'true',
+    text: dbSettings.display_message || '',
+    position: dbSettings.display_message_position || 'bottom',
+    scroll: dbSettings.display_message_scroll === 'true',
   },
 });
 
 server.listen(PORT, () => {
   const ip = getLocalIP();
+  const mdnsName = dbSettings.mdns_name || 'kantahan';
+
   console.log(`Kantahan server → http://localhost:${PORT}`);
   console.log(`  Display : http://${ip}:${PORT}/display`);
   console.log(`  DJ      : http://${ip}:${PORT}/dj`);
   console.log(`  Request : http://${ip}:${PORT}/request`);
+  console.log(`  mDNS    : http://${mdnsName}.local:${PORT}`);
+
+  try {
+    const bonjour = new Bonjour();
+    const svc = bonjour.publish({ name: 'Kantahan', type: 'http', port: PORT });
+    svc.on('error', (err) => console.warn('mDNS:', err.message));
+  } catch (err) {
+    console.warn('mDNS publish failed (non-fatal):', err.message);
+  }
+
   if (process.send) process.send('ready');
 });

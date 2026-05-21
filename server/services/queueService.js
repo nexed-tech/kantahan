@@ -1,5 +1,5 @@
 const { db, getSetting } = require('../db');
-const { setState } = require('../ws');
+const { setState, getState } = require('../ws');
 const { insertWithRotation } = require('./rotation');
 
 function getQueue() {
@@ -39,6 +39,9 @@ function addToQueue(songId, singerName) {
   const useRotation = getSetting('singer_rotation') === 'true';
   let position;
 
+  const queueWasEmpty =
+    db.prepare("SELECT COUNT(*) AS cnt FROM queue WHERE status = 'pending'").get().cnt === 0;
+
   if (useRotation) {
     position = insertWithRotation(singerName);
   } else {
@@ -55,6 +58,11 @@ function addToQueue(songId, singerName) {
     .run(songId, singerName, position);
 
   syncQueue();
+
+  if (getSetting('auto_start') === 'true' && queueWasEmpty && getState().mode === 'idle') {
+    setImmediate(() => require('./playback').beginCountdown());
+  }
+
   return { id: result.lastInsertRowid, position };
 }
 

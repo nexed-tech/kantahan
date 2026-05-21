@@ -55,7 +55,7 @@ function extractCdgPairFromZip(zipPath) {
   }
 }
 
-async function scanLocalMedia(folderPath) {
+async function scanLocalMedia(folderPath, onProgress = null) {
   if (!fs.existsSync(folderPath)) {
     throw new Error(`Folder not found: ${folderPath}`);
   }
@@ -118,7 +118,9 @@ async function scanLocalMedia(folderPath) {
   }
 
   // Video files — probe codec to filter HEVC
-  for (const { filePath, ext } of videoFiles) {
+  for (let i = 0; i < videoFiles.length; i++) {
+    const { filePath, ext } = videoFiles[i];
+    if (onProgress) onProgress({ processed: i + 1, total: videoFiles.length });
     const codec = await getVideoCodec(filePath);
     if (codec === 'hevc' || codec === 'h265') {
       skipped.push({ path: filePath, reason: 'H.265/HEVC not supported in Chromium' });

@@ -121,6 +121,61 @@ function NowPlayingOverlay({ nowPlaying }) {
   );
 }
 
+function UpNextOverlay({ nextItem }) {
+  if (!nextItem) return null;
+  return (
+    <div className="absolute bottom-0 right-0 bg-gradient-to-l from-black/90 via-black/50 to-transparent px-10 py-8 pointer-events-none text-right">
+      <p className="text-brand-dim font-mono text-sm uppercase tracking-[0.3em] mb-1">Up next</p>
+      <p className="font-display font-black text-5xl text-brand-ink leading-tight drop-shadow-xl"
+         style={{ fontStretch: '125%' }}>
+        {nextItem.song?.title || '—'}
+      </p>
+      <p className="text-brand-dim text-2xl mt-1 drop-shadow-lg">{nextItem.singer}</p>
+    </div>
+  );
+}
+
+function MessageOverlay({ message }) {
+  const { text, position, scroll } = message;
+  if (!text) return null;
+
+  const posClass = {
+    top:    'absolute top-8 inset-x-0',
+    center: 'absolute inset-0 flex items-center',
+    bottom: 'absolute bottom-20 inset-x-0',
+  }[position] || 'absolute bottom-20 inset-x-0';
+
+  const textContent = (
+    <p className="text-3xl font-bold text-white/90 drop-shadow-xl px-8 text-center">
+      {text}
+    </p>
+  );
+
+  if (scroll) {
+    const duration = Math.max(8, text.length * 0.15);
+    return (
+      <div className={`${posClass} overflow-hidden pointer-events-none z-30`}>
+        <div
+          className="whitespace-nowrap"
+          style={{
+            animation: `marquee ${duration}s linear infinite`,
+          }}
+        >
+          <p className="text-3xl font-bold text-white/90 drop-shadow-xl px-8 inline">
+            {text}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{text}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`${posClass} pointer-events-none z-30`}>
+      {textContent}
+    </div>
+  );
+}
+
 function PlaybackErrorOverlay({ message }) {
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center bg-brand-bg z-10">
@@ -151,11 +206,17 @@ export default function App() {
   const loadedLocalId   = useRef(null);
   const [localError, setLocalError]  = useState(null);
 
-  // ── Background music player ──────────────────────────────────────────────
+  // ── Background music player (YouTube) ────────────────────────────────────
   const bgDivRef        = useRef(null);
   const bgPlayerRef     = useRef(null);
   const bgPlayerReadyRef = useRef(false);
   const lastBgUrlRef    = useRef('');
+
+  // ── Background music player (local) ──────────────────────────────────────
+  const localBgAudioRef   = useRef(null);
+  const localBgTracksRef  = useRef([]);
+  const localBgIdxRef     = useRef(0);
+  const localBgLoadedRef  = useRef('');
 
   // Always-current refs (safe for stale closures)
   const modeRef = useRef('idle');
@@ -237,7 +298,11 @@ export default function App() {
   useEffect(() => {
     if (!nowSong || nowSong.source !== 'local' || mode !== 'playing') {
       cancelAnimationFrame(cdgAnimRef.current);
-      if (mode !== 'playing') loadedLocalId.current = null;
+      if (mode !== 'playing') {
+        loadedLocalId.current = null;
+        if (localVideoRef.current) localVideoRef.current.pause();
+        if (localAudioRef.current) localAudioRef.current.pause();
+      }
       return;
     }
     if (loadedLocalId.current === nowSong.id) return;
@@ -246,40 +311,60 @@ export default function App() {
     setLocalError(null);
     cancelAnimationFrame(cdgAnimRef.current);
 
+    // Guard: only the first error wins (play() rejection + onerror can both fire)
+    let errorFired = false;
     function onLocalEnded() {
       fetch('/api/playback/ended', { method: 'POST' }).catch(() => {});
     }
     function onLocalError(msg) {
+      if (errorFired) return;
+      errorFired = true;
       setLocalError(msg);
       setTimeout(onLocalEnded, 2500);
     }
 
     if (isLocalVideo && localVideoRef.current) {
       const vid = localVideoRef.current;
+      vid.muted = true;
+      // Set onerror before src so we catch early load errors
+      vid.onerror = () => {
+        const e = vid.error;
+        onLocalError(e ? `Video error (${e.code}): ${e.message}` : 'Video codec not supported');
+      };
       vid.src = `/api/media/file/${nowSong.id}`;
-      vid.onerror = () => onLocalError('Video playback error — codec may not be supported');
-      vid.play().catch(() => {});
+      vid.play()
+        .then(() => { vid.muted = false; })
+        .catch((err) => {
+          // Delay so onerror (DOM event) can fire and win if it's a media error
+          setTimeout(() => onLocalError(`Video: ${err.message || err.name}`), 80);
+        });
     }
 
     if (isLocalCdg) {
       if (!cdgRendererRef.current) cdgRendererRef.current = new CDGRenderer();
       const songId = nowSong.id;
 
+      // Start audio immediately — parallel with CDG fetch
+      const audio = localAudioRef.current;
+      if (audio) {
+        audio.muted = true;
+        audio.onerror = () => onLocalError('Audio file error');
+        audio.src = `/api/media/file/${songId}`;
+        audio.play()
+          .then(() => { audio.muted = false; })
+          .catch((err) => {
+            setTimeout(() => onLocalError(`Audio: ${err.message || err.name}`), 80);
+          });
+      }
+
       fetch(`/api/media/cdg/${songId}`)
         .then((r) => {
-          if (!r.ok) throw new Error(`CDG file not found (${r.status})`);
+          if (!r.ok) throw new Error(`CDG fetch failed (${r.status})`);
           return r.arrayBuffer();
         })
         .then((buf) => {
-          if (loadedLocalId.current !== songId) return; // song changed mid-fetch
+          if (loadedLocalId.current !== songId) return;
           cdgRendererRef.current.load(buf);
-
-          const audio = localAudioRef.current;
-          if (audio) {
-            audio.src = `/api/media/file/${songId}`;
-            audio.onerror = () => onLocalError('Audio playback error');
-            audio.play().catch(() => {});
-          }
 
           const loop = () => {
             if (localAudioRef.current && localCanvasRef.current && cdgRendererRef.current) {
@@ -371,11 +456,73 @@ export default function App() {
 
   useEffect(() => { applyBgMusic(); }, [mode, bgm?.playing, bgm?.url, bgm?.volume]);
 
+  // ── Local background music ────────────────────────────────────────────────
+
+  function applyLocalBgMusic() {
+    const bm = bgmRef.current;
+    const currentMode = modeRef.current;
+    const audio = localBgAudioRef.current;
+    if (!audio || bm?.source !== 'local') return;
+    const tracks = localBgTracksRef.current;
+    const shouldPlay = bm.playing && tracks.length > 0 && (currentMode === 'idle' || currentMode === 'between');
+    audio.volume = Math.max(0, Math.min(1, bm?.volume ?? 0.4));
+    if (shouldPlay) {
+      if (!audio.src || audio.ended) {
+        const idx = localBgIdxRef.current % tracks.length;
+        audio.src = `/api/bgmusic/file/${tracks[idx].idx}`;
+      }
+      if (audio.paused) audio.play().catch(() => {});
+    } else {
+      audio.pause();
+    }
+  }
+
+  function handleLocalBgEnded() {
+    const tracks = localBgTracksRef.current;
+    if (!tracks.length) return;
+    localBgIdxRef.current = (localBgIdxRef.current + 1) % tracks.length;
+    if (localBgAudioRef.current) {
+      localBgAudioRef.current.src = `/api/bgmusic/file/${tracks[localBgIdxRef.current].idx}`;
+      localBgAudioRef.current.play().catch(() => {});
+    }
+  }
+
+  useEffect(() => {
+    if (bgm?.source !== 'local') return;
+    const localPath = bgm?.local_path || '';
+    if (localBgLoadedRef.current === localPath) {
+      applyLocalBgMusic();
+      return;
+    }
+    localBgLoadedRef.current = localPath;
+    fetch('/api/bgmusic/tracks')
+      .then((r) => r.json())
+      .then((tracks) => {
+        localBgTracksRef.current = tracks;
+        localBgIdxRef.current = 0;
+        applyLocalBgMusic();
+      })
+      .catch(() => {});
+  }, [bgm?.source, bgm?.local_path]);
+
+  useEffect(() => {
+    if (bgm?.source === 'local') applyLocalBgMusic();
+    else if (localBgAudioRef.current) localBgAudioRef.current.pause();
+  }, [mode, bgm?.playing, bgm?.volume, bgm?.source]);
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const requestUrl = info?.urls?.request;
-  const isPlaying  = mode === 'playing';
-  const hasError   = isPlaying && (ytError != null || localError != null);
+  const requestUrl    = info?.urls?.request;
+  const isPlaying     = mode === 'playing';
+  const hasError      = isPlaying && (ytError != null || localError != null);
+  const pos           = state?.playback_position;
+  const elapsed       = pos?.elapsed_seconds || 0;
+  const duration      = pos?.duration_seconds || 0;
+  const nextQueue     = state?.queue || [];
+  const showUpNext    = isPlaying && !hasError && nextQueue.length > 0
+                        && duration > 60 && (duration - elapsed) <= 60 && elapsed > 0;
+  const displayMsg    = state?.display_message;
+  const showMessage   = displayMsg?.active && displayMsg?.text && !isPlaying;
   const errorMsg   = localError || (ytError === 101 || ytError === 150
     ? 'Embedding disabled for this video'
     : ytError != null ? 'Video not found or playback error' : null);
@@ -391,14 +538,17 @@ export default function App() {
              backgroundSize: '48px 48px',
            }} />
 
-      {/* Background video (idle/between) */}
+      {/* Local background music (hidden audio) */}
+      <audio ref={localBgAudioRef} onEnded={handleLocalBgEnded} style={{ display: 'none' }} />
+
+      {/* Background video (idle/between) — YouTube only */}
       <div className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${
-        bgm?.playing && bgm?.url && !isPlaying ? 'opacity-100' : 'opacity-0'
+        bgm?.source !== 'local' && bgm?.playing && bgm?.url && !isPlaying ? 'opacity-100' : 'opacity-0'
       }`}>
         <div ref={bgDivRef} className="w-full h-full" />
       </div>
       <div className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-1000 ${
-        bgm?.playing && bgm?.url && !isPlaying ? 'opacity-75' : 'opacity-0'
+        bgm?.source !== 'local' && bgm?.playing && bgm?.url && !isPlaying ? 'opacity-75' : 'opacity-0'
       }`} />
 
       {/* YouTube karaoke player — only for YouTube songs */}
@@ -445,8 +595,17 @@ export default function App() {
         <BetweenScreen countdown={state?.countdown} queue={state?.queue} requestUrl={requestUrl} />
       )}
 
-      {/* Now playing overlay — works for all song types */}
-      {isPlaying && !hasError && <NowPlayingOverlay nowPlaying={nowPlaying} />}
+      {/* Now singing / Up next — crossfade at 1 min remaining */}
+      {isPlaying && !hasError && (
+        <>
+          <div className={`transition-opacity duration-700 ${showUpNext ? 'opacity-0' : 'opacity-100'}`}>
+            <NowPlayingOverlay nowPlaying={nowPlaying} />
+          </div>
+          <div className={`transition-opacity duration-700 ${showUpNext ? 'opacity-100' : 'opacity-0'}`}>
+            <UpNextOverlay nextItem={nextQueue[0]} />
+          </div>
+        </>
+      )}
 
       {/* Logo — top-left, dims while playing */}
       <div className={`absolute top-5 left-6 z-20 pointer-events-none transition-opacity duration-700 ${
@@ -455,12 +614,20 @@ export default function App() {
         <img src={logoUrl} alt="Kantahan" style={{ width: 220, height: 'auto' }} />
       </div>
 
-      {/* Corner QR while playing */}
+      {/* Corner QR — playing: top-right, idle/between: bottom-right */}
       {isPlaying && !hasError && requestUrl && (
         <div className="absolute top-4 right-4 bg-white rounded-lg p-1.5 opacity-50 hover:opacity-90 transition-opacity z-20">
           <QrImg url={requestUrl} size={84} />
         </div>
       )}
+      {!isPlaying && requestUrl && (
+        <div className="absolute bottom-6 right-6 bg-white rounded-xl p-2 opacity-75 z-20">
+          <QrImg url={requestUrl} size={100} />
+        </div>
+      )}
+
+      {/* Configurable message overlay */}
+      {showMessage && <MessageOverlay message={displayMsg} />}
 
       {/* Connection status */}
       <div className="absolute bottom-3 left-4 flex items-center gap-1.5 z-50 opacity-20 hover:opacity-70 transition-opacity">

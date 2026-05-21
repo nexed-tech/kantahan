@@ -3,6 +3,33 @@ import { useState, useEffect, useRef } from 'react';
 const LAST_SINGER_KEY = 'kantahan_dj_last_singer';
 const LIMIT = 50;
 
+const TYPE_BADGE = {
+  cdg:        { label: 'CDG',     cls: 'bg-green-950/60 text-green-400 border-green-800/40' },
+  mp3cdg_zip: { label: 'ZIP CDG', cls: 'bg-purple-950/60 text-purple-300 border-purple-800/40' },
+  mkv:        { label: 'MKV',     cls: 'bg-blue-950/60 text-blue-400 border-blue-800/40' },
+  mp4:        { label: 'MP4',     cls: 'bg-sky-950/60 text-sky-400 border-sky-800/40' },
+  mp3:        { label: 'MP3',     cls: 'bg-teal-950/60 text-teal-400 border-teal-800/40' },
+};
+
+function TypeBadge({ source, fileType }) {
+  if (source === 'youtube') {
+    return (
+      <span className="text-[10px] font-mono bg-red-950/60 text-red-400 px-1 py-0.5 rounded border border-red-800/40 shrink-0">
+        YT
+      </span>
+    );
+  }
+  const info = TYPE_BADGE[fileType] || {
+    label: (fileType || 'LOCAL').toUpperCase(),
+    cls: 'bg-white/10 text-brand-dim/50 border-white/10',
+  };
+  return (
+    <span className={`text-[10px] font-mono px-1 py-0.5 rounded border shrink-0 ${info.cls}`}>
+      {info.label}
+    </span>
+  );
+}
+
 function SongRow({ song, onAddToQueue }) {
   const [adding, setAdding] = useState(false);
   const [singerName, setSingerName] = useState(
@@ -26,36 +53,38 @@ function SongRow({ song, onAddToQueue }) {
     setTimeout(() => setSuccess(false), 2500);
   }
 
+  const subtitle = [song.artist, song.source === 'youtube' ? song.channel_name : null]
+    .filter(Boolean)
+    .join(' · ') || '—';
+
   return (
     <li className="bg-white/5 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
-      <div className="flex items-center gap-3 px-3 py-2.5">
+      <div className="flex items-center gap-2.5 px-2.5 py-2">
         {song.thumbnail_url ? (
-          <img src={song.thumbnail_url} alt="" className="w-10 h-7 object-cover rounded shrink-0" />
+          <img src={song.thumbnail_url} alt="" className="w-9 h-6 object-cover rounded shrink-0" />
         ) : (
-          <div className="w-10 h-7 bg-white/10 rounded flex items-center justify-center text-brand-dim/50 text-xs shrink-0">♪</div>
+          <div className="w-9 h-6 bg-white/10 rounded flex items-center justify-center text-brand-dim/50 text-xs shrink-0">♪</div>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-brand-ink text-sm font-medium truncate">{song.title}</p>
-          <p className="text-brand-dim/60 text-xs truncate">
-            {song.artist || song.channel_name || '—'}
-            <span className="ml-1.5 font-mono uppercase text-[10px] text-brand-dim/30">
-              {song.source}
-            </span>
-          </p>
+          <p className="text-brand-ink text-xs font-medium truncate leading-snug">{song.title}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <p className="text-brand-dim/50 text-[11px] truncate leading-tight min-w-0">{subtitle}</p>
+            <TypeBadge source={song.source} fileType={song.file_type} />
+          </div>
         </div>
         {success ? (
           <span className="text-green-400 text-xs font-mono shrink-0">Added ✓</span>
         ) : (
           <button
             onClick={openAdd}
-            className="shrink-0 text-xs bg-brand-purple/20 hover:bg-brand-purple/40 text-brand-purple px-2.5 py-1.5 rounded-lg transition-colors font-medium"
+            className="shrink-0 text-xs bg-brand-purple/20 hover:bg-brand-purple/40 text-brand-purple px-2 py-1.5 rounded-lg transition-colors font-medium"
           >
             + Queue
           </button>
         )}
       </div>
       {adding && (
-        <div className="flex gap-2 px-3 pb-2.5">
+        <div className="flex gap-2 px-2.5 pb-2">
           <input
             ref={inputRef}
             type="text"
@@ -154,34 +183,34 @@ export default function Library() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search songs..."
-        className="w-full bg-white/5 text-brand-ink text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-purple border border-white/10 placeholder:text-brand-dim/30 transition-colors"
+        className="w-full bg-white/5 text-brand-ink text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-purple border border-white/10 placeholder:text-brand-dim/30 transition-colors"
       />
 
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-1.5 items-center">
         {['', 'youtube', 'local'].map((s) => (
           <button
             key={s || 'all'}
             onClick={() => setSource(s)}
-            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+            className={`text-xs px-2 py-1 rounded-full border transition-colors ${
               source === s
                 ? 'bg-brand-purple/30 border-brand-purple/60 text-brand-purple'
                 : 'bg-white/5 border-white/10 text-brand-dim hover:border-white/20'
             }`}
           >
-            {s || 'All'}
+            {s === '' ? 'All' : s === 'youtube' ? 'YouTube' : 'Local'}
           </button>
         ))}
         {channels.length > 0 && (
           <select
             value={channelId}
             onChange={(e) => setChannel(e.target.value)}
-            className="text-xs px-2.5 py-1 rounded-full border bg-brand-bg border-white/10 text-brand-dim focus:outline-none focus:ring-1 focus:ring-brand-purple"
+            className="text-xs px-2 py-1 rounded-full border bg-brand-bg border-white/10 text-brand-dim focus:outline-none focus:ring-1 focus:ring-brand-purple"
           >
             <option value="">All channels</option>
             {channels.map((c) => (
@@ -191,13 +220,13 @@ export default function Library() {
         )}
       </div>
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-brand-dim/40 text-xs font-mono">Sort:</span>
+      <div className="flex items-center gap-1">
+        <span className="text-brand-dim/40 text-[10px] font-mono">Sort:</span>
         {[['recent', 'Recent'], ['title', 'Title'], ['artist', 'Artist']].map(([v, label]) => (
           <button
             key={v}
             onClick={() => setSort(v)}
-            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
               sort === v
                 ? 'bg-brand-amber/20 border-brand-amber/50 text-brand-amber'
                 : 'bg-white/5 border-white/10 text-brand-dim/60 hover:border-white/20'
@@ -209,14 +238,14 @@ export default function Library() {
       </div>
 
       {loading && songs.length === 0 ? (
-        <p className="text-center text-brand-dim/50 text-sm py-8 font-mono">Loading...</p>
+        <p className="text-center text-brand-dim/50 text-xs py-8 font-mono">Loading...</p>
       ) : !loading && songs.length === 0 ? (
-        <p className="text-center text-brand-dim/50 text-sm py-8">
+        <p className="text-center text-brand-dim/50 text-xs py-8">
           {query ? `No results for "${query}"` : 'No songs in library'}
         </p>
       ) : (
         <>
-          <ul className="space-y-1.5">
+          <ul className="space-y-1">
             {songs.map((song) => (
               <SongRow key={song.id} song={song} onAddToQueue={handleAddToQueue} />
             ))}
@@ -225,9 +254,9 @@ export default function Library() {
             <button
               onClick={loadMore}
               disabled={loading}
-              className="w-full py-2.5 text-brand-dim/50 text-xs font-mono hover:text-brand-dim transition-colors disabled:opacity-40"
+              className="w-full py-2 text-brand-dim/50 text-xs font-mono hover:text-brand-dim transition-colors disabled:opacity-40"
             >
-              {loading ? 'Loading...' : `Load more`}
+              {loading ? 'Loading...' : 'Load more'}
             </button>
           )}
           {!hasMore && songs.length > 0 && (
