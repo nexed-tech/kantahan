@@ -33,7 +33,7 @@ jobs:
           if [ "$RUNNER_OS" == "Linux" ]; then npm run pack:linux; fi
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Kantahan-${{ matrix.os }}
           path: release/
