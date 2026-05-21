@@ -8,7 +8,7 @@ const QRCode = require('qrcode');
 const { Bonjour } = require('bonjour-service');
 
 const { createWsServer, setState } = require('./ws');
-const { getAllSettings, getSetting } = require('./db');
+const { getAllSettings, getSetting, ready: dbReady } = require('./db');
 
 const settingsRouter = require('./routes/api');
 const { router: queueRouter } = require('./routes/queue');
@@ -120,48 +120,50 @@ if (process.env.NODE_ENV === 'production') {
 
 createWsServer(server);
 
-const dbSettings = getAllSettings();
-setState({
-  settings: {
-    auto_approve: dbSettings.auto_approve === 'true',
-    singer_rotation: dbSettings.singer_rotation === 'true',
-    auto_play: dbSettings.auto_play === 'true',
-    auto_queue: dbSettings.auto_queue === 'true',
-    auto_start: dbSettings.auto_start === 'true',
-    countdown_seconds: parseInt(dbSettings.countdown_seconds) || 10,
-  },
-  background_music: {
-    playing: false,
-    volume: parseFloat(dbSettings.background_music_volume || '0.4'),
-    url: dbSettings.background_music_url || '',
-    source: dbSettings.background_music_source || 'youtube',
-    local_path: dbSettings.background_music_local_path || '',
-  },
-  display_message: {
-    active: dbSettings.display_message_active === 'true',
-    text: dbSettings.display_message || '',
-    position: dbSettings.display_message_position || 'bottom',
-    scroll: dbSettings.display_message_scroll === 'true',
-  },
-});
+dbReady.then(() => {
+  const dbSettings = getAllSettings();
+  setState({
+    settings: {
+      auto_approve: dbSettings.auto_approve === 'true',
+      singer_rotation: dbSettings.singer_rotation === 'true',
+      auto_play: dbSettings.auto_play === 'true',
+      auto_queue: dbSettings.auto_queue === 'true',
+      auto_start: dbSettings.auto_start === 'true',
+      countdown_seconds: parseInt(dbSettings.countdown_seconds) || 10,
+    },
+    background_music: {
+      playing: false,
+      volume: parseFloat(dbSettings.background_music_volume || '0.4'),
+      url: dbSettings.background_music_url || '',
+      source: dbSettings.background_music_source || 'youtube',
+      local_path: dbSettings.background_music_local_path || '',
+    },
+    display_message: {
+      active: dbSettings.display_message_active === 'true',
+      text: dbSettings.display_message || '',
+      position: dbSettings.display_message_position || 'bottom',
+      scroll: dbSettings.display_message_scroll === 'true',
+    },
+  });
 
-server.listen(PORT, () => {
-  const ip = getLocalIP();
-  const mdnsName = dbSettings.mdns_name || 'kantahan';
+  server.listen(PORT, () => {
+    const ip = getLocalIP();
+    const mdnsName = dbSettings.mdns_name || 'kantahan';
 
-  console.log(`Kantahan server → http://localhost:${PORT}`);
-  console.log(`  Display : http://${ip}:${PORT}/display`);
-  console.log(`  DJ      : http://${ip}:${PORT}/dj`);
-  console.log(`  Request : http://${ip}:${PORT}/request`);
-  console.log(`  mDNS    : http://${mdnsName}.local:${PORT}`);
+    console.log(`Kantahan server → http://localhost:${PORT}`);
+    console.log(`  Display : http://${ip}:${PORT}/display`);
+    console.log(`  DJ      : http://${ip}:${PORT}/dj`);
+    console.log(`  Request : http://${ip}:${PORT}/request`);
+    console.log(`  mDNS    : http://${mdnsName}.local:${PORT}`);
 
-  try {
-    const bonjour = new Bonjour();
-    const svc = bonjour.publish({ name: 'Kantahan', type: 'http', port: PORT });
-    svc.on('error', (err) => console.warn('mDNS:', err.message));
-  } catch (err) {
-    console.warn('mDNS publish failed (non-fatal):', err.message);
-  }
+    try {
+      const bonjour = new Bonjour();
+      const svc = bonjour.publish({ name: 'Kantahan', type: 'http', port: PORT });
+      svc.on('error', (err) => console.warn('mDNS:', err.message));
+    } catch (err) {
+      console.warn('mDNS publish failed (non-fatal):', err.message);
+    }
 
-  if (process.send) process.send('ready');
+    if (process.send) process.send('ready');
+  });
 });

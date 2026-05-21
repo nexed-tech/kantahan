@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { fork } = require('child_process');
@@ -24,15 +24,19 @@ function startServer() {
   const serverPath = path.join(__dirname, '../server/index.js');
 
   serverProcess = fork(serverPath, [], {
+    silent: true, // pipe stdio so we can capture errors
     env: {
       ...process.env,
       PORT: String(PORT),
       NODE_ENV: 'production',
-      NODE_OPTIONS: '--experimental-sqlite',
       DB_PATH: path.join(app.getPath('userData'), 'karaoke.db'),
       FFPROBE_PATH: getFfprobePath(),
     },
   });
+
+  let stderrBuf = '';
+  serverProcess.stderr.on('data', (d) => { stderrBuf += d; });
+  serverProcess.stdout.on('data', () => {}); // drain stdout
 
   serverProcess.on('message', (msg) => {
     if (msg === 'ready') {
@@ -41,10 +45,17 @@ function startServer() {
     }
   });
 
-  serverProcess.on('error', (err) => console.error('Server error:', err));
+  serverProcess.on('error', (err) => {
+    dialog.showErrorBox('Kantahan — Server Error', err.message);
+  });
+
   serverProcess.on('exit', (code) => {
     if (code !== 0 && !app.isQuitting) {
-      console.error('Server exited unexpectedly with code', code);
+      dialog.showErrorBox(
+        'Kantahan failed to start',
+        `Server exited with code ${code}.\n\n${stderrBuf.slice(-2000)}`
+      );
+      app.quit();
     }
   });
 }
@@ -124,7 +135,10 @@ function setupTray() {
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
-app.whenReady().then(startServer);
+app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
+  startServer();
+});
 
 // Keep the process alive in the tray — do not auto-quit when the window is hidden
 app.on('window-all-closed', () => {});

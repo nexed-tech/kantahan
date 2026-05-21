@@ -41,6 +41,7 @@ async function runIndexing(channelId, channelName) {
       },
     });
   } catch (err) {
+    console.error('[channels] Indexing error:', err);
     setState({
       indexing: {
         active: false,
@@ -48,7 +49,7 @@ async function runIndexing(channelId, channelName) {
         processed: 0,
         skipped: 0,
         total: null,
-        error: err.message,
+        error: err?.message ?? String(err),
       },
     });
   }
@@ -88,13 +89,15 @@ async function resolveAndIndex(channel) {
     });
     try {
       const resolved = await resolveChannelId(url, apiKey);
-      db.prepare('DELETE FROM channels WHERE id = ?').run(id);
-      db.prepare('INSERT OR IGNORE INTO channels (id, name, url) VALUES (?, ?, ?)').run(resolved.id, resolved.name, url);
+      db.run('DELETE FROM channels WHERE id = ?', id);
+      db.run('INSERT OR IGNORE INTO channels (id, name, url) VALUES (?, ?, ?)', resolved.id, resolved.name, url);
       id = resolved.id;
       name = resolved.name;
     } catch (err) {
+      const msg = err?.message ?? String(err);
+      console.error(`[channels] Failed to resolve/index ${name}:`, err);
       setState({
-        indexing: { active: false, channel_name: name, processed: 0, skipped: 0, total: null, error: `Could not resolve ${name}: ${err.message}` },
+        indexing: { active: false, channel_name: name, processed: 0, skipped: 0, total: null, error: `Could not resolve ${name}: ${msg}` },
       });
       return;
     }
