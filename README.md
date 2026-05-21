@@ -1,6 +1,6 @@
 # Kantahan
 
-[![Support me on Ko-fi](https://ko-fi.com)](https://ko-fi.com/stephancraane)
+[![Support me on Ko-fi](https://storage.ko-fi.com/cdn/brandasset/v2/support_me_on_kofi_blue.png)](https://ko-fi.com/stephancraane)
 
 **Kantahan.app** — self-hosted karaoke app. Electron desktop shell + Express backend + three React frontends.
 
