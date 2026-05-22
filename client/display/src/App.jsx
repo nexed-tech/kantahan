@@ -228,6 +228,18 @@ export default function App() {
     fetch('/api/info').then((r) => r.json()).then(setInfo).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    function toggleFullscreen() {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen().catch(() => {});
+    }
+    function onKey(e) {
+      if (e.key === 'F11') { e.preventDefault(); toggleFullscreen(); }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const mode          = state?.mode || 'idle';
   const bgm           = state?.background_music;
   const nowPlaying    = state?.now_playing;
@@ -262,7 +274,7 @@ export default function App() {
       playerRef.current = new window.YT.Player(ytDivRef.current, {
         height: '100%', width: '100%', videoId: '',
         playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0,
-                      iv_load_policy: 3, modestbranding: 1, rel: 0, playsinline: 1 },
+                      iv_load_policy: 3, modestbranding: 1, rel: 0, playsinline: 1, mute: 1 },
         events: {
           onReady: () => {
             playerReadyRef.current = true;
@@ -273,6 +285,9 @@ export default function App() {
             }
           },
           onStateChange: (e) => {
+            // Unmute as soon as playback starts — muted autoplay is allowed by browsers,
+            // but unmuting in response to a media event (not on page load) is also permitted.
+            if (e.data === window.YT.PlayerState.PLAYING) e.target.unMute();
             if (e.data === window.YT.PlayerState.ENDED)
               fetch('/api/playback/ended', { method: 'POST' }).catch(() => {});
           },
@@ -528,7 +543,13 @@ export default function App() {
     : ytError != null ? 'Video not found or playback error' : null);
 
   return (
-    <div className="w-screen h-screen bg-brand-bg relative overflow-hidden">
+    <div
+      className="w-screen h-screen bg-brand-bg relative overflow-hidden"
+      onDoubleClick={() => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen().catch(() => {});
+      }}
+    >
 
       {/* Subtle grid texture */}
       <div className="absolute inset-0 pointer-events-none opacity-30"
@@ -556,6 +577,8 @@ export default function App() {
         isPlaying && !isLocalSong && !ytError ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}>
         <div ref={ytDivRef} className="w-full h-full" />
+        {/* Transparent cover that intercepts mouse events so YouTube's hover overlay never appears */}
+        <div className="absolute inset-0" />
       </div>
 
       {/* Local video player — mkv/mp4 */}
