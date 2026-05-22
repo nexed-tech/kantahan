@@ -1,4 +1,5 @@
 FROM node:22-alpine
+org.opencontainers.image.source = "https://github.com/nexed-tech/kantahan"
 
 RUN apk add --no-cache ffmpeg
 
