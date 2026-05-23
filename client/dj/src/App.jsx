@@ -466,6 +466,13 @@ export default function App() {
             <span className="text-brand-dim font-mono capitalize">{modeLabel}</span>
           </div>
           <button
+            onClick={() => window.open(window.location.origin + '/display', '_blank', 'noopener')}
+            title="Open display screen in new window (F11 or double-click for fullscreen)"
+            className="text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-brand-dim/60 hover:text-brand-dim transition-colors font-mono"
+          >
+            Display ↗
+          </button>
+          <button
             onClick={() => setShowSettings(true)}
             title="Settings"
             className="p-1.5 rounded-lg hover:bg-white/10 text-brand-dim hover:text-brand-ink transition-colors text-base leading-none"

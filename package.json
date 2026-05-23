@@ -1,6 +1,6 @@
 {
   "name": "kantahan",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "Kantahan.app — self-hosted karaoke app",
   "main": "electron/main.js",
   "workspaces": [
