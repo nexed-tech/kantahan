@@ -1,6 +1,6 @@
 services:
   kantahan:
-    build: .
+    image: ghcr.io/nexed-tech/kantahan:latest
     ports:
       - "3000:3000"
     volumes:

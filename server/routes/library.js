@@ -28,7 +28,8 @@ router.get('/', (req, res) => {
   if (source) { conditions.push('source = ?'); params.push(source); }
   if (channelId) { conditions.push('channel_id = ?'); params.push(channelId); }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  conditions.push('(ephemeral IS NULL OR ephemeral = 0)');
+  const where = `WHERE ${conditions.join(' AND ')}`;
 
   const results = db
     .prepare(
@@ -49,6 +50,7 @@ router.get('/random', (req, res) => {
     .prepare(
       `SELECT id, title, artist, source, channel_name, thumbnail_url, duration_seconds
        FROM songs
+       WHERE (ephemeral IS NULL OR ephemeral = 0)
        ORDER BY RANDOM()
        LIMIT ?`
     )
@@ -65,7 +67,8 @@ router.get('/search', (req, res) => {
     .prepare(
       `SELECT id, title, artist, source, channel_name, thumbnail_url, duration_seconds
        FROM songs
-       WHERE title LIKE ? OR artist LIKE ? OR channel_name LIKE ?
+       WHERE (ephemeral IS NULL OR ephemeral = 0)
+         AND (title LIKE ? OR artist LIKE ? OR channel_name LIKE ?)
        ORDER BY
          CASE WHEN title LIKE ? THEN 0 ELSE 1 END,
          title
@@ -124,6 +127,7 @@ router.get('/letters', (req, res) => {
          CASE WHEN (${firstLetterExpr}) BETWEEN 'A' AND 'Z' THEN (${firstLetterExpr}) ELSE '#' END AS letter,
          COUNT(*) AS count
        FROM songs
+       WHERE (ephemeral IS NULL OR ephemeral = 0)
        GROUP BY letter
        ORDER BY
          CASE WHEN letter = '#' THEN 1 ELSE 0 END,
@@ -154,7 +158,7 @@ router.get('/browse', (req, res) => {
     .prepare(
       `SELECT id, title, artist, source, channel_name, thumbnail_url, duration_seconds
        FROM songs
-       WHERE ${filter.clause}
+       WHERE (ephemeral IS NULL OR ephemeral = 0) AND ${filter.clause}
        ORDER BY ${sortKeyExpr}, UPPER(title)
        LIMIT ? OFFSET ?`
     )

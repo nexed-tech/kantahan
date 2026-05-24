@@ -15,12 +15,12 @@ router.post('/scan', async (req, res) => {
   // Respond immediately; scan runs in background
   res.json({ ok: true });
 
-  setState({ scanning: { active: true, processed: 0, total: null, skipped: [], error: null } });
+  setState({ scanning: { active: true, phase: 'discovering', discovered: 0, processed: 0, total: null, skipped: [], error: null } });
 
   try {
-    const { results, skipped } = await scanLocalMedia(folderPath, ({ processed, total }) => {
+    const { results, skipped } = await scanLocalMedia(folderPath, ({ phase, discovered, processed, total }) => {
       setState({
-        scanning: { active: true, processed, total, skipped: [], error: null },
+        scanning: { active: true, phase, discovered: discovered ?? 0, processed: processed ?? 0, total, skipped: [], error: null },
       });
     });
 

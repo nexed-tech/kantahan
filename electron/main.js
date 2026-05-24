@@ -1,47 +1,100 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
-const fs = require('fs');
+const fs   = require('fs');
 const { fork } = require('child_process');
 
 let mainWindow;
 let serverProcess;
 let tray;
+let hasShownTrayHint = false;
 
-const PORT = parseInt(process.env.PORT) || 3000;
+const PORT          = parseInt(process.env.PORT) || 3000;
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'app-settings.json');
 
-// In a packaged app, ffprobe-static's binary is unpacked outside the ASAR archive.
-// The module's __dirname still points inside the ASAR, so fix the path manually.
+// ── Persisted app settings (close behaviour, etc.) ────────────────────────────
+
+function readAppSettings() {
+  try { return JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf8')); } catch { return {}; }
+}
+
+function writeAppSettings(updates) {
+  const current = readAppSettings();
+  fs.writeFileSync(SETTINGS_PATH, JSON.stringify({ ...current, ...updates }, null, 2));
+}
+
+// ── ffprobe path fix for packaged app ─────────────────────────────────────────
+
 function getFfprobePath() {
   try {
     const { path: p } = require('ffprobe-static');
     return app.isPackaged ? p.replace('app.asar', 'app.asar.unpacked') : p;
-  } catch {
-    return '';
-  }
+  } catch { return ''; }
 }
+
+// ── Tray ──────────────────────────────────────────────────────────────────────
+
+function setupTray() {
+  if (tray) return; // already running
+
+  const iconPath = path.join(__dirname, 'icon.png');
+  const icon = fs.existsSync(iconPath)
+    ? nativeImage.createFromPath(iconPath)
+    : nativeImage.createFromDataURL(
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      );
+
+  try {
+    tray = new Tray(icon);
+  } catch (e) {
+    console.warn('Tray unavailable:', e.message);
+    tray = null;
+    return;
+  }
+
+  tray.setToolTip(`Kantahan  (port ${PORT})`);
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Show DJ Screen', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+    { type: 'separator' },
+    { label: `Display  →  localhost:${PORT}/display`, click: () => shell.openExternal(`http://localhost:${PORT}/display`) },
+    { label: `Requests  →  localhost:${PORT}/request`, click: () => shell.openExternal(`http://localhost:${PORT}/request`) },
+    { type: 'separator' },
+    { label: 'Quit Kantahan', click: () => { app.isQuitting = true; app.quit(); } },
+  ]));
+
+  tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus(); });
+}
+
+function teardownTray() {
+  if (tray) { tray.destroy(); tray = null; }
+  hasShownTrayHint = false;
+}
+
+// ── Server ────────────────────────────────────────────────────────────────────
 
 function startServer() {
   const serverPath = path.join(__dirname, '../server/index.js');
 
   serverProcess = fork(serverPath, [], {
-    silent: true, // pipe stdio so we can capture errors
+    silent: true,
     env: {
       ...process.env,
-      PORT: String(PORT),
-      NODE_ENV: 'production',
-      DB_PATH: path.join(app.getPath('userData'), 'karaoke.db'),
+      PORT:       String(PORT),
+      NODE_ENV:   'production',
+      DB_PATH:    path.join(app.getPath('userData'), 'karaoke.db'),
       FFPROBE_PATH: getFfprobePath(),
+      ELECTRON:   '1',   // tells the server (and therefore the UI) it's inside Electron
     },
   });
 
   let stderrBuf = '';
   serverProcess.stderr.on('data', (d) => { stderrBuf += d; });
-  serverProcess.stdout.on('data', () => {}); // drain stdout
+  serverProcess.stdout.on('data', () => {});
 
   serverProcess.on('message', (msg) => {
     if (msg === 'ready') {
       createWindow();
-      setupTray();
+      // Restore tray if the user had it enabled last session
+      if (readAppSettings().closeBehaviour === 'tray') setupTray();
     }
   });
 
@@ -60,6 +113,8 @@ function startServer() {
   });
 }
 
+// ── Window ────────────────────────────────────────────────────────────────────
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -71,67 +126,45 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
   mainWindow.loadURL(`http://localhost:${PORT}/dj`);
 
-  // Hide to tray instead of closing
   mainWindow.on('close', (e) => {
-    if (!app.isQuitting) {
+    if (app.isQuitting) return;
+    const { closeBehaviour } = readAppSettings();
+    if (closeBehaviour === 'tray' && tray) {
       e.preventDefault();
       mainWindow.hide();
+      if (!hasShownTrayHint) {
+        hasShownTrayHint = true;
+        tray.displayBalloon({
+          iconType: 'info',
+          title: 'Kantahan is still running',
+          content: 'The server is active in the background. Right-click the tray icon to quit.',
+        });
+      }
     }
   });
 
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
-function setupTray() {
-  // Use bundled icon if present, otherwise fall back to a 1×1 placeholder
-  const iconPath = path.join(__dirname, 'icon.png');
-  let icon;
-  if (fs.existsSync(iconPath)) {
-    icon = nativeImage.createFromPath(iconPath);
-  } else {
-    // Minimal valid 1×1 PNG — replace electron/icon.png with a proper 256×256 icon
-    icon = nativeImage.createFromDataURL(
-      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-    );
-  }
+// ── IPC ───────────────────────────────────────────────────────────────────────
 
-  try {
-    tray = new Tray(icon);
-  } catch (e) {
-    console.warn('Tray unavailable:', e.message);
-    return;
-  }
+ipcMain.handle('get-close-behaviour', () => {
+  return readAppSettings().closeBehaviour || 'quit';
+});
 
-  tray.setToolTip(`Kantahan  (port ${PORT})`);
-  tray.setContextMenu(Menu.buildFromTemplate([
-    {
-      label: 'Show DJ Screen',
-      click: () => { mainWindow?.show(); mainWindow?.focus(); },
-    },
-    { type: 'separator' },
-    {
-      label: `Display  →  localhost:${PORT}/display`,
-      click: () => shell.openExternal(`http://localhost:${PORT}/display`),
-    },
-    {
-      label: `Requests  →  localhost:${PORT}/request`,
-      click: () => shell.openExternal(`http://localhost:${PORT}/request`),
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit Kantahan',
-      click: () => { app.isQuitting = true; app.quit(); },
-    },
-  ]));
-
-  // Double-click tray icon to bring window back
-  tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus(); });
-}
+ipcMain.handle('set-close-behaviour', (_, value) => {
+  if (value !== 'quit' && value !== 'tray') return { ok: false };
+  writeAppSettings({ closeBehaviour: value });
+  if (value === 'tray') setupTray();
+  else teardownTray();
+  return { ok: true };
+});
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
@@ -140,16 +173,14 @@ app.whenReady().then(() => {
   startServer();
 });
 
-// Keep the process alive in the tray — do not auto-quit when the window is hidden
-app.on('window-all-closed', () => {});
+app.on('window-all-closed', () => { app.quit(); });
 
 app.on('before-quit', () => {
   app.isQuitting = true;
   if (serverProcess) { serverProcess.kill(); serverProcess = null; }
 });
 
-// macOS: clicking the dock icon brings the window back
+// macOS: re-open the window when clicking the dock icon
 app.on('activate', () => {
-  if (mainWindow) mainWindow.show();
-  else if (serverProcess) createWindow();
+  if (!mainWindow && serverProcess) createWindow();
 });

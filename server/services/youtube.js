@@ -139,4 +139,71 @@ async function* fetchChannelVideos(channelId, apiKey) {
   } while (pageToken);
 }
 
-module.exports = { resolveChannelId, fetchChannelVideos, parseSongTitle };
+// Search YouTube and return song-shaped results (non-embeddable videos filtered out).
+// Costs ~101 API units per call (100 for search.list + 1 for videos.list batch).
+async function searchYouTube(query, apiKey, maxResults = 10) {
+  const searchData = await ytFetch('search', {
+    part: 'snippet',
+    q: query,
+    type: 'video',
+    maxResults,
+    key: apiKey,
+  });
+
+  if (!searchData.items?.length) return [];
+
+  const ids = searchData.items.map((i) => i.id.videoId).join(',');
+  const videoData = await ytFetch('videos', {
+    part: 'contentDetails,status',
+    id: ids,
+    key: apiKey,
+  });
+
+  const details = {};
+  for (const v of (videoData.items || [])) {
+    details[v.id] = {
+      duration:   parseISO8601(v.contentDetails?.duration),
+      embeddable: v.status?.embeddable !== false,
+    };
+  }
+
+  return searchData.items
+    .filter((i) => details[i.id.videoId]?.embeddable !== false)
+    .map((i) => {
+      const { artist, title } = parseSongTitle(i.snippet.title);
+      return {
+        id:               i.id.videoId,
+        title,
+        artist,
+        source:           'youtube',
+        channel_name:     i.snippet.channelTitle,
+        thumbnail_url:    i.snippet.thumbnails?.default?.url || null,
+        duration_seconds: details[i.id.videoId]?.duration || null,
+      };
+    });
+}
+
+// Fetch details for a single video by ID (for the URL-paste flow).
+// Costs 1 API unit.
+async function getVideoDetails(videoId, apiKey) {
+  const data = await ytFetch('videos', {
+    part: 'snippet,contentDetails,status',
+    id:   videoId,
+    key:  apiKey,
+  });
+  const v = data.items?.[0];
+  if (!v) throw new Error('Video not found');
+  if (v.status?.embeddable === false) throw new Error('Video is not embeddable');
+  const { artist, title } = parseSongTitle(v.snippet.title);
+  return {
+    id:               v.id,
+    title,
+    artist,
+    source:           'youtube',
+    channel_name:     v.snippet.channelTitle,
+    thumbnail_url:    v.snippet.thumbnails?.default?.url || null,
+    duration_seconds: parseISO8601(v.contentDetails?.duration),
+  };
+}
+
+module.exports = { resolveChannelId, fetchChannelVideos, parseSongTitle, searchYouTube, getVideoDetails };

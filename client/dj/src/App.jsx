@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useWebSocket } from '../../shared/useWebSocket';
+import { djFetch } from './lib/djFetch';
 import Settings from './components/Settings';
 import RequestsInbox from './components/RequestsInbox';
 import Library from './components/Library';
@@ -204,9 +205,8 @@ function DisplayMessageCard({ displayMsg }) {
   useEffect(() => { setCustomText(text); }, [text]);
 
   async function applySettings(updates) {
-    await fetch('/api/settings', {
+    await djFetch('/api/settings', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updates),
     });
   }
@@ -371,8 +371,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
 
   const apiFetch = useCallback(
-    (url, opts = {}) =>
-      fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts }),
+    (url, opts = {}) => djFetch(url, opts),
     []
   );
 

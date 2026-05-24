@@ -61,7 +61,28 @@ async function indexChannel(channelId, channelName, onProgress) {
     throw err;
   }
 
-  return { processed: videos.length, skipped };
+  // Remove videos that were deleted from the channel since the last index.
+  const freshIds = new Set(videos.map((v) => v.id));
+  const existingIds = db
+    .prepare('SELECT id FROM songs WHERE channel_id = ?')
+    .all(channelId)
+    .map((r) => r.id);
+  const staleIds = existingIds.filter((id) => !freshIds.has(id));
+  if (staleIds.length > 0) {
+    const ph = staleIds.map(() => '?').join(',');
+    db.exec('BEGIN');
+    try {
+      db.run(`DELETE FROM queue    WHERE song_id IN (${ph}) AND status = 'pending'`, ...staleIds);
+      db.run(`DELETE FROM requests WHERE song_id IN (${ph}) AND status = 'pending'`, ...staleIds);
+      db.run(`DELETE FROM songs    WHERE id IN (${ph})`, ...staleIds);
+      db.exec('COMMIT');
+    } catch (err) {
+      try { db.exec('ROLLBACK'); } catch {}
+      throw err;
+    }
+  }
+
+  return { processed: videos.length, skipped, removed: staleIds.length };
 }
 
 module.exports = { indexChannel };

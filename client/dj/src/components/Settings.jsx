@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { djFetch } from '../lib/djFetch';
 
 function Field({ label, hint, children }) {
   return (
@@ -10,42 +11,72 @@ function Field({ label, hint, children }) {
   );
 }
 
+// Single-line summary row shown when a section is configured and collapsed.
+function CollapsedRow({ dot, label, sublabel, onExpand }) {
+  return (
+    <div className="flex items-center justify-between py-0.5">
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+        <span className="text-sm text-brand-dim">{label}</span>
+        {sublabel && <span className="text-brand-dim/40 font-mono text-xs">· {sublabel}</span>}
+      </div>
+      <button
+        onClick={onExpand}
+        className="text-brand-dim/40 hover:text-brand-dim transition-colors text-base leading-none px-1"
+        title="Edit"
+      >
+        ⚙
+      </button>
+    </div>
+  );
+}
+
 const inputCls =
   'bg-white/5 text-brand-ink text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-purple border border-white/10 focus:border-brand-purple/50 placeholder:text-brand-dim/30 transition-colors';
 
 export default function Settings({ indexing, scanning }) {
-  const [apiKey, setApiKey] = useState('');
-  const [apiKeySet, setApiKeySet] = useState(false);
-  const [apiKeyMsg, setApiKeyMsg] = useState('');
+  // ── API key ──────────────────────────────────────────────────────────────────
+  const [apiKey, setApiKey]           = useState('');
+  const [apiKeySet, setApiKeySet]     = useState(false);
+  const [apiKeyMsg, setApiKeyMsg]     = useState('');
+  const [apiKeyExpanded, setApiKeyExpanded] = useState(true); // collapses once key is confirmed set
 
-  const [localPath, setLocalPath] = useState('');
-  const [bgMusicUrl, setBgMusicUrl] = useState('');
-  const [bgMusicSource, setBgMusicSource] = useState('youtube');
+  // ── PIN ───────────────────────────────────────────────────────────────────────
+  const [pinSet, setPinSet]           = useState(false);
+  const [newPin, setNewPin]           = useState('');
+  const [pinMsg, setPinMsg]           = useState('');
+  const [pinExpanded, setPinExpanded] = useState(true);
+
+  // ── General ───────────────────────────────────────────────────────────────────
+  const [localPath, setLocalPath]           = useState('');
+  const [bgMusicUrl, setBgMusicUrl]         = useState('');
+  const [bgMusicSource, setBgMusicSource]   = useState('youtube');
   const [bgMusicLocalPath, setBgMusicLocalPath] = useState('');
-  const [countdown, setCountdown] = useState('10');
-  const [hostUrl, setHostUrl] = useState('');
-  const [info, setInfo] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [countdown, setCountdown]           = useState('10');
+  const [hostUrl, setHostUrl]               = useState('');
+  const [saving, setSaving]                 = useState(false);
 
-  const [channels, setChannels] = useState([]);
-  const [channelUrl, setChannelUrl] = useState('');
+  // ── Channels ──────────────────────────────────────────────────────────────────
+  const [channels, setChannels]         = useState([]);
+  const [channelUrl, setChannelUrl]     = useState('');
   const [addingChannel, setAddingChannel] = useState(false);
   const [channelError, setChannelError] = useState('');
-  const prevIndexingActiveRef = useRef(false);
+  const prevIndexingActiveRef           = useRef(false);
+  const [skippedOpen, setSkippedOpen]   = useState(false);
 
-  const [skippedOpen, setSkippedOpen] = useState(false);
+  // ── Info / network ────────────────────────────────────────────────────────────
+  const [info, setInfo] = useState(null);
 
-  // PIN management
-  const [pinSet, setPinSet] = useState(false);
-  const [newPin, setNewPin] = useState('');
-  const [pinMsg, setPinMsg] = useState('');
+  // ── Close behaviour (Electron only) ──────────────────────────────────────────
+  const [closeBehaviour, setCloseBehaviourState] = useState('quit');
 
+  // ── Mount ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    fetch('/api/settings/youtube-api-key/status')
+    djFetch('/api/settings/youtube-api-key/status')
       .then((r) => r.json())
-      .then((d) => setApiKeySet(d.set));
+      .then((d) => { setApiKeySet(d.set); setApiKeyExpanded(!d.set); });
 
-    fetch('/api/settings')
+    djFetch('/api/settings')
       .then((r) => r.json())
       .then((s) => {
         setLocalPath(s.local_media_path || '');
@@ -56,42 +87,44 @@ export default function Settings({ indexing, scanning }) {
         setHostUrl(s.host_url || '');
       });
 
-    fetch('/api/info')
+    djFetch('/api/info')
       .then((r) => r.json())
       .then(setInfo)
       .catch(() => {});
 
-    fetch('/api/settings/dj-pin/status')
+    djFetch('/api/settings/dj-pin/status')
       .then((r) => r.json())
-      .then((d) => setPinSet(d.set))
+      .then((d) => { setPinSet(d.set); setPinExpanded(!d.set); })
       .catch(() => {});
+
+    // Close behaviour — only available when running inside Electron
+    if (typeof window.electronAPI !== 'undefined') {
+      window.electronAPI.getCloseBehaviour().then(setCloseBehaviourState);
+    }
 
     loadChannels();
   }, []);
 
-  function loadChannels() {
-    fetch('/api/channels')
-      .then((r) => r.json())
-      .then(setChannels)
-      .catch(() => {});
-  }
-
-  // Reload channel list when indexing finishes (picks up resolved names + video counts)
+  // Reload channel list when indexing finishes
   useEffect(() => {
-    if (prevIndexingActiveRef.current && !indexing?.active) {
-      loadChannels();
-    }
+    if (prevIndexingActiveRef.current && !indexing?.active) loadChannels();
     prevIndexingActiveRef.current = indexing?.active ?? false;
   }, [indexing?.active]);
 
+  // ── Actions ───────────────────────────────────────────────────────────────────
+
+  function loadChannels() {
+    djFetch('/api/channels').then((r) => r.json()).then(setChannels).catch(() => {});
+  }
+
   async function reindexAll() {
-    await fetch('/api/channels/reindex-all', { method: 'POST' });
+    await djFetch('/api/channels/reindex-all', { method: 'POST' });
   }
 
   async function saveApiKey() {
     setSaving(true);
     try {
-      const res = await fetch('/api/settings/youtube-api-key', {
+      const res  = await djFetch('/api/settings/youtube-api-key', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: apiKey }),
@@ -99,7 +132,26 @@ export default function Settings({ indexing, scanning }) {
       const data = await res.json();
       setApiKeySet(data.set);
       setApiKey('');
+      setApiKeyExpanded(!data.set); // collapse if saved, expand (to re-enter) if cleared
       setApiKeyMsg(data.set ? 'API key saved.' : 'Key cleared.');
+      setTimeout(() => setApiKeyMsg(''), 3000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function clearApiKey() {
+    setSaving(true);
+    try {
+      await djFetch('/api/settings/youtube-api-key', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: '' }),
+      });
+      setApiKeySet(false);
+      setApiKey('');
+      setApiKeyExpanded(true);
+      setApiKeyMsg('Key cleared.');
       setTimeout(() => setApiKeyMsg(''), 3000);
     } finally {
       setSaving(false);
@@ -109,7 +161,7 @@ export default function Settings({ indexing, scanning }) {
   async function saveGeneralSettings() {
     setSaving(true);
     try {
-      await fetch('/api/settings', {
+      await djFetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -131,34 +183,30 @@ export default function Settings({ indexing, scanning }) {
     setAddingChannel(true);
     setChannelError('');
     try {
-      const res = await fetch('/api/channels', {
+      const res  = await djFetch('/api/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: channelUrl.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setChannelError(data.error || 'Failed to add channel');
-      } else {
-        setChannelUrl('');
-        loadChannels();
-      }
+      if (!res.ok) setChannelError(data.error || 'Failed to add channel');
+      else { setChannelUrl(''); loadChannels(); }
     } finally {
       setAddingChannel(false);
     }
   }
 
   async function reindexChannel(id) {
-    await fetch(`/api/channels/${id}/reindex`, { method: 'POST' });
+    await djFetch(`/api/channels/${id}/reindex`, { method: 'POST' });
   }
 
   async function deleteChannel(id) {
-    await fetch(`/api/channels/${id}`, { method: 'DELETE' });
+    await djFetch(`/api/channels/${id}`, { method: 'DELETE' });
     setChannels((prev) => prev.filter((c) => c.id !== id));
   }
 
   async function scanLocal() {
-    await fetch('/api/media/scan', { method: 'POST' });
+    await djFetch('/api/media/scan', { method: 'POST' });
   }
 
   async function savePin(pinOverride) {
@@ -168,7 +216,7 @@ export default function Settings({ indexing, scanning }) {
       setTimeout(() => setPinMsg(''), 3000);
       return;
     }
-    const res = await fetch('/api/settings/dj-pin', {
+    const res  = await djFetch('/api/settings/dj-pin', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin }),
@@ -176,16 +224,27 @@ export default function Settings({ indexing, scanning }) {
     const data = await res.json();
     setPinSet(data.set);
     setNewPin('');
+    setPinExpanded(!data.set); // collapse if PIN was set, expand if removed
     setPinMsg(pin ? 'PIN saved.' : 'PIN removed.');
     setTimeout(() => setPinMsg(''), 3000);
   }
 
+  async function handleCloseBehaviourChange(value) {
+    setCloseBehaviourState(value);
+    if (typeof window.electronAPI !== 'undefined') {
+      await window.electronAPI.setCloseBehaviour(value);
+    }
+  }
+
+  // ── Derived state ─────────────────────────────────────────────────────────────
   const isIndexing = indexing?.active;
   const isScanning = scanning?.active;
   const scanDone   = !isScanning && scanning?.processed > 0 && !scanning?.error;
 
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
+
       {/* Network info */}
       {info && (
         <div className="bg-white/5 rounded-xl p-4 space-y-2 text-sm border border-white/10">
@@ -204,44 +263,68 @@ export default function Settings({ indexing, scanning }) {
         </div>
       )}
 
-      {/* YouTube API key */}
-      <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
-        <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">YouTube</p>
-        <Field
-          label="API Key"
-          hint={
-            apiKeySet
-              ? 'A key is saved. Enter a new one to replace it, or leave blank to clear.'
-              : 'Required for YouTube channel indexing and search.'
-          }
-        >
-          <div className="flex gap-2 mt-1">
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={apiKeySet ? '••••••••••••' : 'AIza...'}
-              className={`flex-1 ${inputCls}`}
+      {/* ── YouTube API key ── */}
+      <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+        {apiKeySet && !apiKeyExpanded ? (
+          <div className="px-4 py-3">
+            <CollapsedRow
+              dot="bg-green-400"
+              label="YouTube API key"
+              sublabel="configured"
+              onExpand={() => setApiKeyExpanded(true)}
             />
-            <button
-              onClick={saveApiKey}
-              disabled={saving}
-              className="bg-brand-purple hover:bg-brand-purple/80 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+          </div>
+        ) : (
+          <div className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">YouTube</p>
+              {apiKeySet && (
+                <button
+                  onClick={() => setApiKeyExpanded(false)}
+                  className="text-brand-dim/40 hover:text-brand-dim transition-colors text-xs font-mono"
+                >
+                  collapse ↑
+                </button>
+              )}
+            </div>
+            <Field
+              label="API Key"
+              hint={apiKeySet
+                ? 'A key is saved. Enter a new one to replace it.'
+                : 'Required for YouTube channel indexing and search.'}
             >
-              Save
-            </button>
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={apiKeySet ? '••••••••••••' : 'AIza...'}
+                  className={`flex-1 ${inputCls}`}
+                />
+                <button
+                  onClick={saveApiKey}
+                  disabled={saving}
+                  className="bg-brand-purple hover:bg-brand-purple/80 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+                >
+                  Save
+                </button>
+                {apiKeySet && (
+                  <button
+                    onClick={clearApiKey}
+                    disabled={saving}
+                    className="bg-brand-pink/20 hover:bg-brand-pink/30 disabled:opacity-50 text-brand-pink text-sm px-3 py-2 rounded-lg transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {apiKeyMsg && <p className="text-green-400 text-xs mt-1 font-mono">{apiKeyMsg}</p>}
+            </Field>
           </div>
-          {apiKeyMsg && <p className="text-green-400 text-xs mt-1 font-mono">{apiKeyMsg}</p>}
-          <div className="flex items-center gap-2 mt-2">
-            <span className={`w-2 h-2 rounded-full ${apiKeySet ? 'bg-green-400' : 'bg-white/20'}`} />
-            <span className="text-xs text-brand-dim/60 font-mono">
-              {apiKeySet ? 'Key is configured' : 'No key set'}
-            </span>
-          </div>
-        </Field>
+        )}
       </div>
 
-      {/* YouTube channels */}
+      {/* ── YouTube channels ── */}
       <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
         <div className="flex items-center justify-between">
           <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">YouTube Channels</p>
@@ -274,6 +357,9 @@ export default function Settings({ indexing, scanning }) {
             Indexed {indexing.processed} songs from {indexing.channel_name}
             {indexing.skipped > 0 && (
               <span className="text-brand-dim/60">, skipped {indexing.skipped} (embedding disabled)</span>
+            )}
+            {indexing.removed > 0 && (
+              <span className="text-brand-dim/60">, removed {indexing.removed} deleted</span>
             )}
           </p>
         )}
@@ -341,7 +427,7 @@ export default function Settings({ indexing, scanning }) {
         </Field>
       </div>
 
-      {/* General settings */}
+      {/* ── General settings ── */}
       <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
         <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">General</p>
 
@@ -386,6 +472,7 @@ export default function Settings({ indexing, scanning }) {
               : 'Folder with MP3/MP4 files to shuffle between songs'}
           </p>
         </div>
+
         <Field label="Countdown duration (seconds)">
           <input
             type="number"
@@ -396,6 +483,7 @@ export default function Settings({ indexing, scanning }) {
             className={`w-24 ${inputCls}`}
           />
         </Field>
+
         <Field
           label="Host URL override"
           hint="Leave blank to use kantahan.local (recommended). Set to e.g. http://192.168.1.50:3000 for Docker or networks without mDNS."
@@ -408,6 +496,7 @@ export default function Settings({ indexing, scanning }) {
             className={`w-full ${inputCls}`}
           />
         </Field>
+
         <Field
           label="Local media folder"
           hint="Path to folder with .mp3/.cdg pairs or .mkv/.mp4 files"
@@ -420,6 +509,7 @@ export default function Settings({ indexing, scanning }) {
             className={`w-full ${inputCls}`}
           />
         </Field>
+
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={saveGeneralSettings}
@@ -441,10 +531,16 @@ export default function Settings({ indexing, scanning }) {
         {isScanning && (
           <div className="space-y-1">
             <div className="flex justify-between text-xs text-brand-dim/60 font-mono">
-              <span>Scanning files...</span>
               <span>
-                {scanning.processed}
-                {scanning.total ? ` / ${scanning.total}` : ''}
+                {scanning.phase === 'discovering' && 'Discovering files…'}
+                {scanning.phase === 'indexing'    && 'Indexing CDG / ZIP pairs…'}
+                {scanning.phase === 'probing'     && 'Checking video codecs…'}
+                {!scanning.phase                  && 'Scanning files…'}
+              </span>
+              <span>
+                {scanning.phase === 'discovering'
+                  ? `${(scanning.discovered ?? 0).toLocaleString()} found`
+                  : `${(scanning.processed ?? 0).toLocaleString()}${scanning.total ? ` / ${scanning.total.toLocaleString()}` : ''}`}
               </span>
             </div>
             <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -466,6 +562,9 @@ export default function Settings({ indexing, scanning }) {
               Found {scanning.processed} files
               {scanning.skipped?.length > 0 && (
                 <span className="text-brand-dim/60">, skipped {scanning.skipped.length}</span>
+              )}
+              {scanning.removed > 0 && (
+                <span className="text-brand-dim/60">, removed {scanning.removed} stale</span>
               )}
             </p>
             {scanning.skipped?.length > 0 && (
@@ -494,47 +593,101 @@ export default function Settings({ indexing, scanning }) {
         )}
       </div>
 
-      {/* DJ PIN */}
-      <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
-        <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">DJ PIN</p>
-        <div className="flex items-center gap-2 mb-1">
-          <span className={`w-2 h-2 rounded-full ${pinSet ? 'bg-green-400' : 'bg-white/20'}`} />
-          <span className="text-xs text-brand-dim/60 font-mono">
-            {pinSet ? 'PIN is set' : 'No PIN — open access'}
-          </span>
-        </div>
-        <Field
-          label={pinSet ? 'Change PIN' : 'Set PIN'}
-          hint="4-digit PIN. Leave blank to remove PIN."
-        >
-          <div className="flex gap-2 mt-1">
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={4}
-              value={newPin}
-              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="1234"
-              className={`w-28 font-mono tracking-widest ${inputCls}`}
+      {/* ── DJ PIN ── */}
+      <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+        {pinSet && !pinExpanded ? (
+          <div className="px-4 py-3">
+            <CollapsedRow
+              dot="bg-green-400"
+              label="DJ PIN"
+              sublabel="set"
+              onExpand={() => setPinExpanded(true)}
             />
-            <button
-              onClick={savePin}
-              className="bg-brand-purple hover:bg-brand-purple/80 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-            >
-              {pinSet ? 'Change' : 'Set PIN'}
-            </button>
-            {pinSet && (
-              <button
-                onClick={() => savePin('')}
-                className="bg-brand-pink/20 hover:bg-brand-pink/30 text-brand-pink text-sm px-3 py-2 rounded-lg transition-colors"
-              >
-                Remove
-              </button>
+          </div>
+        ) : (
+          <div className="p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">DJ PIN</p>
+              {pinSet && (
+                <button
+                  onClick={() => setPinExpanded(false)}
+                  className="text-brand-dim/40 hover:text-brand-dim transition-colors text-xs font-mono"
+                >
+                  collapse ↑
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${pinSet ? 'bg-green-400' : 'bg-white/20'}`} />
+              <span className="text-xs text-brand-dim/60 font-mono">
+                {pinSet ? 'PIN is set' : 'No PIN — open access'}
+              </span>
+            </div>
+            <Field label={pinSet ? 'Change PIN' : 'Set PIN'} hint="4-digit PIN. Leave blank to remove PIN.">
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="1234"
+                  className={`w-28 font-mono tracking-widest ${inputCls}`}
+                />
+                <button
+                  onClick={() => savePin()}
+                  className="bg-brand-purple hover:bg-brand-purple/80 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+                >
+                  {pinSet ? 'Change' : 'Set PIN'}
+                </button>
+                {pinSet && (
+                  <button
+                    onClick={() => savePin('')}
+                    className="bg-brand-pink/20 hover:bg-brand-pink/30 text-brand-pink text-sm px-3 py-2 rounded-lg transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {pinMsg && <p className="text-green-400 text-xs mt-1 font-mono">{pinMsg}</p>}
+            </Field>
+          </div>
+        )}
+      </div>
+
+      {/* ── App behaviour (Electron only) ── */}
+      {info?.electron && (
+        <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-white/10">
+          <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">App</p>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-brand-dim">When closing the window</label>
+            <div className="flex gap-2 mt-2">
+              {[
+                ['quit', 'Quit Kantahan'],
+                ['tray', 'Minimise to tray'],
+              ].map(([val, lbl]) => (
+                <button
+                  key={val}
+                  onClick={() => handleCloseBehaviourChange(val)}
+                  className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                    closeBehaviour === val
+                      ? 'bg-brand-purple/20 border-brand-purple/50 text-brand-purple'
+                      : 'bg-white/5 border-white/10 text-brand-dim hover:border-white/20'
+                  }`}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            {closeBehaviour === 'tray' && (
+              <p className="text-brand-dim/40 text-xs font-mono pt-1">
+                The server keeps running in the background. Right-click the tray icon to quit.
+              </p>
             )}
           </div>
-          {pinMsg && <p className="text-green-400 text-xs mt-1 font-mono">{pinMsg}</p>}
-        </Field>
-      </div>
+        </div>
+      )}
+
     </div>
   );
 }

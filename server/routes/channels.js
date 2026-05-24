@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { db, getSetting } = require('../db');
 const { setState, getState } = require('../ws');
+const { requireDjAuth } = require('../middleware/auth');
 const { resolveChannelId } = require('../services/youtube');
 const { indexChannel } = require('../services/indexer');
 const { syncQueue } = require('../services/queueService');
@@ -24,7 +25,7 @@ async function runIndexing(channelId, channelName) {
   });
 
   try {
-    const { processed, skipped } = await indexChannel(channelId, channelName, (p, s) => {
+    const { processed, skipped, removed } = await indexChannel(channelId, channelName, (p, s) => {
       setState({
         indexing: { ...getState().indexing, processed: p, skipped: s },
       });
@@ -36,6 +37,7 @@ async function runIndexing(channelId, channelName) {
         channel_name: channelName,
         processed,
         skipped,
+        removed: removed ?? 0,
         total: processed,
         error: null,
       },
@@ -55,7 +57,7 @@ async function runIndexing(channelId, channelName) {
   }
 }
 
-router.post('/', async (req, res) => {
+router.post('/', requireDjAuth, async (req, res) => {
   const { url } = req.body;
   if (!url) return res.status(400).json({ error: 'url required' });
 
@@ -106,7 +108,7 @@ async function resolveAndIndex(channel) {
   await runIndexing(id, name);
 }
 
-router.post('/reindex-all', async (req, res) => {
+router.post('/reindex-all', requireDjAuth, async (req, res) => {
   const channels = db.prepare('SELECT * FROM channels ORDER BY name').all();
   if (!channels.length) return res.json({ ok: true, count: 0 });
 
@@ -119,7 +121,7 @@ router.post('/reindex-all', async (req, res) => {
   }
 });
 
-router.post('/:id/reindex', (req, res) => {
+router.post('/:id/reindex', requireDjAuth, (req, res) => {
   const channel = db.prepare('SELECT * FROM channels WHERE id = ?').get(req.params.id);
   if (!channel) return res.status(404).json({ error: 'Channel not found' });
 
@@ -130,7 +132,7 @@ router.post('/:id/reindex', (req, res) => {
   resolveAndIndex(channel);
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requireDjAuth, (req, res) => {
   const songIds = db
     .prepare('SELECT id FROM songs WHERE channel_id = ?')
     .all(req.params.id)

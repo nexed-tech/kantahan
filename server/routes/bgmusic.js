@@ -3,6 +3,7 @@ const fs = require('fs');
 const { Router } = require('express');
 const { getState, setState } = require('../ws');
 const { getSetting, setSetting } = require('../db');
+const { requireDjAuth } = require('../middleware/auth');
 
 const router = Router();
 
@@ -53,19 +54,19 @@ router.get('/file/:idx', (req, res) => {
   });
 });
 
-router.post('/play', (_req, res) => {
+router.post('/play', requireDjAuth, (_req, res) => {
   const bm = getState().background_music;
   setState({ background_music: { ...bm, playing: true } });
   res.json({ ok: true });
 });
 
-router.post('/pause', (_req, res) => {
+router.post('/pause', requireDjAuth, (_req, res) => {
   const bm = getState().background_music;
   setState({ background_music: { ...bm, playing: false } });
   res.json({ ok: true });
 });
 
-router.put('/volume', (req, res) => {
+router.put('/volume', requireDjAuth, (req, res) => {
   const { volume } = req.body;
   if (typeof volume !== 'number' || volume < 0 || volume > 1)
     return res.status(400).json({ error: 'volume must be 0–1' });

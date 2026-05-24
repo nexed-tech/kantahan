@@ -9,6 +9,7 @@ const { Bonjour } = require('bonjour-service');
 
 const { createWsServer, setState } = require('./ws');
 const { getAllSettings, getSetting, ready: dbReady } = require('./db');
+const { issueToken, requireDjAuth } = require('./middleware/auth');
 
 const settingsRouter = require('./routes/api');
 const { router: queueRouter } = require('./routes/queue');
@@ -17,7 +18,8 @@ const libraryRouter = require('./routes/library');
 const channelsRouter = require('./routes/channels');
 const playbackRouter = require('./routes/playback');
 const mediaRouter = require('./routes/media');
-const bgMusicRouter = require('./routes/bgmusic');
+const bgMusicRouter  = require('./routes/bgmusic');
+const youtubeRouter  = require('./routes/youtube');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,9 +33,10 @@ app.use('/api/queue', queueRouter);
 app.use('/api/requests', requestsRouter);
 app.use('/api/library', libraryRouter);
 app.use('/api/channels', channelsRouter);
-app.use('/api/playback', playbackRouter);
+app.use('/api/playback', requireDjAuth, playbackRouter);
 app.use('/api/media', mediaRouter);
-app.use('/api/bgmusic', bgMusicRouter);
+app.use('/api/bgmusic',  bgMusicRouter);
+app.use('/api/youtube', requireDjAuth, youtubeRouter);
 
 function getLocalIP() {
   const nets = os.networkInterfaces();
@@ -79,6 +82,7 @@ app.get('/api/info', (_req, res) => {
     localIP: ip,
     port: PORT,
     dev: process.env.NODE_ENV !== 'production',
+    electron: process.env.ELECTRON === '1',
     baseUrl: base,
     urls: buildUrls(base),
   });
@@ -97,15 +101,17 @@ app.get('/api/qr', async (req, res) => {
   }
 });
 
-// PIN verification (client-side UX guard — not a security boundary)
+// PIN verification — on success issues a session token the DJ client must send
+// on all protected requests as "Authorization: Bearer <token>".
 app.post('/api/auth/verify-pin', async (req, res) => {
   const { pin } = req.body;
   if (typeof pin !== 'string') return res.status(400).json({ ok: false });
   const bcrypt = require('bcryptjs');
   const hash = getSetting('dj_pin_hash');
-  if (!hash) return res.json({ ok: true }); // no PIN set — open access
+  if (!hash) return res.json({ ok: true, token: issueToken() }); // no PIN set — grant immediately
   const ok = await bcrypt.compare(pin, hash);
-  res.json({ ok });
+  if (!ok) return res.json({ ok: false });
+  res.json({ ok: true, token: issueToken() });
 });
 
 if (process.env.NODE_ENV === 'production') {

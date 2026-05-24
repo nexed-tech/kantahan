@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { db, getSetting } = require('../db');
 const { setState } = require('../ws');
 const { addToQueue } = require('../services/queueService');
+const { requireDjAuth } = require('../middleware/auth');
 
 const router = Router();
 
@@ -72,7 +73,7 @@ router.post('/', (req, res) => {
   res.json({ id: Number(result.lastInsertRowid), queued, queue_position });
 });
 
-router.put('/:id', (req, res) => {
+router.put('/:id', requireDjAuth, (req, res) => {
   const { singer_name } = req.body;
   if (!singer_name) return res.status(400).json({ error: 'singer_name required' });
   db.prepare(
@@ -82,7 +83,7 @@ router.put('/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-router.post('/:id/approve', (req, res) => {
+router.post('/:id/approve', requireDjAuth, (req, res) => {
   const request = db
     .prepare("SELECT * FROM requests WHERE id = ? AND status = 'pending'")
     .get(req.params.id);
@@ -100,7 +101,7 @@ router.post('/:id/approve', (req, res) => {
   res.json({ ok: true, queue_position });
 });
 
-router.post('/:id/reject', (req, res) => {
+router.post('/:id/reject', requireDjAuth, (req, res) => {
   db.prepare("UPDATE requests SET status = 'rejected' WHERE id = ?").run(req.params.id);
   syncRequestsState();
   res.json({ ok: true });

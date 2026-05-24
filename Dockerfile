@@ -1,5 +1,15 @@
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+# Install all deps (including devDependencies for the Vite build)
+COPY package*.json ./
+COPY client ./client
+RUN npm ci
+RUN npm run build
+
+# ── Production image ──────────────────────────────────────────────────────────
 FROM node:22-alpine
-org.opencontainers.image.source = "https://github.com/nexed-tech/kantahan"
+LABEL org.opencontainers.image.source = "https://github.com/nexed-tech/kantahan"
 
 RUN apk add --no-cache ffmpeg
 
@@ -8,7 +18,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY server ./server
-COPY dist ./dist
+COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
 ENV NODE_OPTIONS=--experimental-sqlite
