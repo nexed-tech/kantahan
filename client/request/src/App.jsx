@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWebSocket } from '../../shared/useWebSocket';
 import logoUrl from './assets/logo-marquee-primary-animated.svg';
+import { Songbook } from './Songbook';
 
 const NAME_KEY = 'kantahan_singer_name';
 
@@ -114,6 +115,7 @@ export default function App() {
   const [success, setSuccess] = useState(false);
   const [submittedData, setSubmittedData] = useState(null);
   const [listVisible, setListVisible] = useState(true);
+  const [view, setView] = useState('home'); // 'home' | 'songbook'
   const debounceRef = useRef(null);
 
   // Load random songs on mount
@@ -187,6 +189,34 @@ export default function App() {
   const listLabel = isSearching ? 'Results' : 'Suggested songs';
   const queue = state?.queue || [];
 
+  // Songbook song selection re-uses the same confirm flow
+  function handleSongbookSelect(song) {
+    setSelected(song);
+  }
+
+  if (view === 'songbook') {
+    return (
+      <>
+        {selected && (
+          <ConfirmDialog
+            song={selected}
+            singerName={name.trim()}
+            onConfirm={handleSubmit}
+            onCancel={handleDone}
+            submitting={submitting}
+            success={success}
+            submittedData={submittedData}
+          />
+        )}
+        <Songbook
+          onSelect={handleSongbookSelect}
+          onBack={() => setView('home')}
+          nameEntered={!!name.trim()}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-brand-bg text-brand-ink pb-10">
       {selected && (
@@ -202,9 +232,25 @@ export default function App() {
       )}
 
       <div className="max-w-lg mx-auto px-4 pt-6 space-y-5">
-        {/* Logo header */}
-        <div className="flex justify-center pt-2">
-          <img src={logoUrl} alt="Kantahan" style={{ width: 180, height: 'auto' }} />
+        {/* Logo header with songbook icon */}
+        <div className="flex items-center pt-2">
+          <div className="w-10" /> {/* spacer to keep logo centred */}
+          <div className="flex-1 flex justify-center">
+            <img src={logoUrl} alt="Kantahan" style={{ width: 180, height: 'auto' }} />
+          </div>
+          <button
+            onClick={() => setView('songbook')}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 active:bg-white/15 text-brand-dim hover:text-brand-ink transition-colors"
+            aria-label="Open songbook"
+            title="Browse all songs"
+          >
+            {/* Book icon */}
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+          </button>
         </div>
 
         {/* Name field */}
