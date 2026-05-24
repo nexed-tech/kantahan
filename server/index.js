@@ -79,6 +79,7 @@ app.get('/api/info', (_req, res) => {
     localIP: ip,
     port: PORT,
     dev: process.env.NODE_ENV !== 'production',
+    electron: process.env.ELECTRON === '1',
     baseUrl: base,
     urls: buildUrls(base),
   });

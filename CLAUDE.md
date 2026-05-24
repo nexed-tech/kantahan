@@ -1,6 +1,6 @@
 # Kantahan.app — Pending Work
 
-Release 1.6 — Settings: Close Behaviour
+Release 1.6 — Settings: Close Behaviour ✓ DONE
 Add a "When closing the window" option to the DJ app settings screen.
 
 Options:
@@ -24,7 +24,7 @@ Testing checklist:
 
 ---
 
-Release 1.7 — Settings: Collapse Configured Sections
+Release 1.7 — Settings: Collapse Configured Sections ✓ DONE
 Once a setting block has been fully configured, collapse it to a single summary line so the Settings screen doesn't grow endlessly. Start with the YouTube API key block.
 
 YouTube API key block
