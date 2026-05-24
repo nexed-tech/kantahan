@@ -1,65 +1,52 @@
 # Kantahan.app — Pending Work
 
-Kantahan — Follow-up Brief (Session 2 + Release 1.5)
-This brief covers five targeted improvements to the existing working app.
-Do not restructure or refactor existing working code unless directly required by one of these changes.
-Work through each item in order — each is independently testable.
+Release 1.6 — Settings: Close Behaviour
+Add a "When closing the window" option to the DJ app settings screen.
+
+Options:
+  • Quit Kantahan (default) — current behaviour; closes window and kills the server
+  • Minimise to tray — hides the window, keeps the server running, adds a system tray icon with "Show DJ Screen" / "Quit Kantahan" menu items and a one-time balloon hint on first hide
+
+Implementation notes:
+- Store the preference in Electron's `app.getPath('userData')/settings.json` (same pattern as other settings, or create it if none exists yet)
+- The main process reads the setting at startup; the renderer can update it via an `ipcRenderer.invoke('set-setting', key, value)` / `ipcMain.handle` pair
+- Tray setup (icon, context menu, double-click to restore) lives in `electron/main.js` and is only initialised when the setting is active
+- Default value: `'quit'`
+
+Testing checklist:
+[ ] Default: closing window quits the app fully (no processes left in Task Manager)
+[ ] Switch to "minimise to tray": closing window hides it; tray icon appears in system tray
+[ ] Tray icon right-click → "Show DJ Screen" restores the window
+[ ] Tray icon right-click → "Quit Kantahan" exits fully
+[ ] First hide shows a balloon notification; subsequent hides do not
+[ ] Switching back to "quit" and closing the window exits fully; tray icon is gone
+[ ] Setting persists across app restarts
+
 ---
 
-Release 1.5 — Songbook Browse View
-1. Songbook Browse on Request Screen
-Context: Filipino karaoke culture is built around physical songbooks — thick indexed books where people browse by song title or artist name before picking. Users will expect to browse the full library, not just search. This feature adds a classic songbook-style browse experience to the request screen.
-Layout
-Add a "Songbook" button/tab on the request screen alongside the existing search/random view. Tapping it opens the songbook view.
-Two tabs within songbook view:
-By Song — full library sorted alphabetically by song title
-By Artist — full library sorted alphabetically by artist name
-Letter Index (the key feature)
-Down the right side of the screen: a vertical strip of letter buttons A–Z plus # (for numbers/symbols).
-Tapping a letter jumps the list instantly to that section
-Each section has a sticky header showing the letter
-Familiar to anyone who has used a physical karaoke songbook
-```
-┌─────────────────────────────┐
-│ [By Song] [By Artist]       │  A
-│                             │  B
-│ ── A ──────────────────     │  C
-│ A Thousand Years            │  D
-│   Christina Perri · VEVO    │  E
-│ Anak                        │  F
-│   Freddie Aguilar · OPM     │  G
-│                             │  H
-│ ── B ──────────────────     │  ...
-│ Baby                        │  Z
-│   Justin Bieber · Zoom      │  #
-└─────────────────────────────┘
-```
-Behaviour
-By Song tab: sorted by `title`, grouped by first letter of title. Ignore leading "The", "A", "An" for sorting purposes (e.g. "The Beatles" sorts under B).
-By Artist tab: sorted by `artist`, grouped by first letter of artist name. Songs with no parsed artist go under #.
-Tapping a song: same confirm flow as search — singer name + song confirm sheet → submit request
-Letter jump: smooth scroll to section, no full page reload
-Performance: virtual scrolling required — 36k songs cannot all be in the DOM. Use `react-virtual` or `react-window`. Load sections on demand as user scrolls.
-Back button: returns to main request screen (random browse + search)
-API endpoint needed
-```
-GET /api/library/browse?mode=song|artist&letter=A&limit=50&offset=0
-  → Returns songs filtered by first letter of title or artist
-  → Sorted alphabetically
-  → Paginated
+Release 1.7 — Settings: Collapse Configured Sections
+Once a setting block has been fully configured, collapse it to a single summary line so the Settings screen doesn't grow endlessly. Start with the YouTube API key block.
 
-GET /api/library/letters?mode=song|artist
-  → Returns array of available first letters in the library
-  → e.g. ["#", "A", "B", "C", ...]
-  → Used to build the letter index strip (grey out letters with no songs)
-```
-Notes
-Grey out letters in the index strip that have no songs (e.g. X or Z may be empty)
-On By Artist tab, if artist field is null/empty for a song, show it under #
-The letter strip should always be visible while scrolling — position fixed on the right edge
-This is a touch-first UI — letter buttons minimum 32px height, song rows minimum 56px
-Consider showing song count per letter in a tiny badge on the letter button (optional but nice)
+YouTube API key block
+- When no key is set: show the current full UI (label, input, save button, status message) — no change
+- When a key IS set: collapse to a single row:
+  `● YouTube API key  ·  configured    [⚙]`
+  Clicking the ⚙ cog icon expands the block back to the full UI (input pre-cleared for security, same save/clear flow as today)
+- Collapsed state re-evaluates on mount based on the API key status fetched from `GET /api/settings/youtube-api-key/status`
+- Expanding the cog also shows a "Remove key" / clear button so the user can revoke without having to type anything
+
+Apply the same collapsible pattern to any other setting block that benefits from it (DJ PIN, local media folder once scanned, etc.) — use the same `⚙` toggle convention throughout so the UI is consistent.
+
+Testing checklist:
+[ ] Settings opens with key set → YouTube block shows single summary line
+[ ] Settings opens with no key → YouTube block shows full input UI
+[ ] Clicking ⚙ with key set → block expands to full input UI
+[ ] Saving a new key via the expanded UI → block collapses back to summary line
+[ ] "Remove key" in expanded UI clears the key → block returns to full input UI
+[ ] Same collapsed/expand behaviour works for DJ PIN once a PIN is set
+
 ---
+
 Testing Checklist
 After implementing session 2 items, verify:
 [ ] Re-index a YouTube channel — non-embeddable videos absent from library, count shown in UI

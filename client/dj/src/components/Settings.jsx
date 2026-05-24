@@ -275,6 +275,9 @@ export default function Settings({ indexing, scanning }) {
             {indexing.skipped > 0 && (
               <span className="text-brand-dim/60">, skipped {indexing.skipped} (embedding disabled)</span>
             )}
+            {indexing.removed > 0 && (
+              <span className="text-brand-dim/60">, removed {indexing.removed} deleted</span>
+            )}
           </p>
         )}
 
@@ -441,10 +444,16 @@ export default function Settings({ indexing, scanning }) {
         {isScanning && (
           <div className="space-y-1">
             <div className="flex justify-between text-xs text-brand-dim/60 font-mono">
-              <span>Scanning files...</span>
               <span>
-                {scanning.processed}
-                {scanning.total ? ` / ${scanning.total}` : ''}
+                {scanning.phase === 'discovering' && 'Discovering files…'}
+                {scanning.phase === 'indexing'    && 'Indexing CDG / ZIP pairs…'}
+                {scanning.phase === 'probing'     && 'Checking video codecs…'}
+                {!scanning.phase                  && 'Scanning files…'}
+              </span>
+              <span>
+                {scanning.phase === 'discovering'
+                  ? `${(scanning.discovered ?? 0).toLocaleString()} found`
+                  : `${(scanning.processed ?? 0).toLocaleString()}${scanning.total ? ` / ${scanning.total.toLocaleString()}` : ''}`}
               </span>
             </div>
             <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">

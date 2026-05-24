@@ -24,7 +24,7 @@ async function runIndexing(channelId, channelName) {
   });
 
   try {
-    const { processed, skipped } = await indexChannel(channelId, channelName, (p, s) => {
+    const { processed, skipped, removed } = await indexChannel(channelId, channelName, (p, s) => {
       setState({
         indexing: { ...getState().indexing, processed: p, skipped: s },
       });
@@ -36,6 +36,7 @@ async function runIndexing(channelId, channelName) {
         channel_name: channelName,
         processed,
         skipped,
+        removed: removed ?? 0,
         total: processed,
         error: null,
       },
