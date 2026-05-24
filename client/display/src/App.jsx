@@ -223,10 +223,31 @@ export default function App() {
   const bgmRef  = useRef(null);
 
   const [info, setInfo] = useState(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   useEffect(() => {
     fetch('/api/info').then((r) => r.json()).then(setInfo).catch(() => {});
   }, []);
+
+  // ── Audio interaction gate ────────────────────────────────────────────────
+  // Browsers block unmuted audio until the user has interacted with the page.
+  // We detect the first interaction and permanently unlock autoplay for this tab.
+  useEffect(() => {
+    if (audioUnlocked) return;
+    const unlock = () => {
+      setAudioUnlocked(true);
+      // Resume any suspended AudioContext (belt-and-suspenders)
+      try { new AudioContext().resume(); } catch {}
+    };
+    document.addEventListener('click',   unlock, { once: true });
+    document.addEventListener('keydown', unlock, { once: true });
+    document.addEventListener('touchend',unlock, { once: true });
+    return () => {
+      document.removeEventListener('click',   unlock);
+      document.removeEventListener('keydown', unlock);
+      document.removeEventListener('touchend',unlock);
+    };
+  }, [audioUnlocked]);
 
   useEffect(() => {
     function toggleFullscreen() {
@@ -368,6 +389,20 @@ export default function App() {
         audio.play()
           .then(() => { audio.muted = false; })
           .catch((err) => {
+            if (err.name === 'AbortError') return; // src changed mid-load — expected, not an error
+            // NotAllowedError = browser blocked autoplay before user interaction.
+            // Retry once the user taps/clicks the display page.
+            if (err.name === 'NotAllowedError') {
+              const retry = () => {
+                if (loadedLocalId.current !== songId) return; // song already changed
+                audio.play()
+                  .then(() => { audio.muted = false; })
+                  .catch(() => onLocalError('Audio: autoplay blocked. Tap the screen to enable audio.'));
+              };
+              document.addEventListener('click',   retry, { once: true });
+              document.addEventListener('touchend', retry, { once: true });
+              return;
+            }
             setTimeout(() => onLocalError(`Audio: ${err.message || err.name}`), 80);
           });
       }
@@ -383,16 +418,14 @@ export default function App() {
 
           const loop = () => {
             if (localAudioRef.current && localCanvasRef.current && cdgRendererRef.current) {
-              cdgRendererRef.current.renderToCanvas(
-                localCanvasRef.current,
-                localAudioRef.current.currentTime
-              );
+              cdgRendererRef.current.renderToCanvas(localCanvasRef.current, localAudioRef.current.currentTime);
             }
             cdgAnimRef.current = requestAnimationFrame(loop);
           };
           cdgAnimRef.current = requestAnimationFrame(loop);
         })
         .catch((err) => {
+          console.error('[CDG] fetch/load error:', err.message);
           if (loadedLocalId.current === songId) onLocalError(err.message);
         });
     }

@@ -83,7 +83,10 @@ router.get('/file/:id', (req, res) => {
   if (!song || !song.file_path) return res.status(404).json({ error: 'Not found' });
 
   if (song.file_type === 'mp3cdg_zip') {
-    // Read MP3 directly from ZIP — consistent with CDG route, no temp files needed
+    // Read MP3 directly from ZIP and serve with full range-request support.
+    // Range support is required for the browser <audio> element to get a proper 206 response
+    // to its initial probe request; without it, audio.currentTime stays NaN/0 while buffering
+    // the full file, which prevents the CDG renderer from advancing past packet 0 (blank screen).
     try {
       const zip   = new AdmZip(song.file_path);
       const entry = zip.getEntry(song.zip_mp3_entry);
@@ -92,8 +95,25 @@ router.get('/file/:id', (req, res) => {
       if (!buf || buf.length === 0) {
         return res.status(500).json({ error: 'MP3 entry returned empty data' });
       }
+      const total      = buf.length;
+      const rangeHeader = req.headers['range'];
       res.set('Content-Type', 'audio/mpeg');
-      res.set('Content-Length', String(buf.length));
+      res.set('Accept-Ranges', 'bytes');
+      if (rangeHeader) {
+        const [startStr, endStr] = rangeHeader.replace(/bytes=/, '').split('-');
+        const start = parseInt(startStr, 10) || 0;
+        const end   = endStr ? Math.min(parseInt(endStr, 10), total - 1) : total - 1;
+        if (start > end || start >= total) {
+          res.set('Content-Range', `bytes */${total}`);
+          return res.status(416).end();
+        }
+        const chunk = end - start + 1;
+        res.status(206);
+        res.set('Content-Range',  `bytes ${start}-${end}/${total}`);
+        res.set('Content-Length', String(chunk));
+        return res.end(buf.slice(start, end + 1));
+      }
+      res.set('Content-Length', String(total));
       return res.end(buf);
     } catch (err) {
       return res.status(500).json({ error: `MP3 read failed: ${err.message}` });

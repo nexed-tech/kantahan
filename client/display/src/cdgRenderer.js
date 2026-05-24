@@ -9,7 +9,7 @@ const PPS            = 75; // packets per second
 const I_MEM_PRESET   = 1;
 const I_BORDER       = 2;
 const I_TILE         = 6;
-const I_TILE_XOR     = 56;
+const I_TILE_XOR     = 38;
 const I_COL_LOW      = 30;
 const I_COL_HIGH     = 31;
 const I_SCROLL_FILL  = 32;
@@ -38,6 +38,9 @@ export class CDGRenderer {
 
   renderToCanvas(canvas, currentTime) {
     if (!this._data) return;
+    // Guard against NaN/Infinity currentTime (can occur when audio lacks range-request support
+    // and the browser hasn't resolved duration yet — avoids silently skipping all packets).
+    if (!isFinite(currentTime) || currentTime < 0) return;
     const target = Math.min(Math.floor(currentTime * PPS), this._total - 1);
     if (target === this._last) return;
     if (target < this._last) this._reset();
