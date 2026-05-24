@@ -28,7 +28,12 @@ Three screens, one server:
 |---|---|---|
 | **Display** | The TV / projector | Open the link on your TV browser, go fullscreen (F11 or double-click) |
 | **DJ remote** | The person running the night | Open on any browser — laptop, tablet, phone |
-| **Request** | Your guests | Scan the QR code on the TV |
+| **Request**/**Songbook** | Your guests | Scan the QR code on the TV |
+
+<img src="assets/img/dj_screen.png" alt="DJ Screen" width="300">
+<img src="assets/img/tv_screen.png" alt="TV Screen" width="187">
+<img src="assets/img/request_screen.png" alt="Request Screen" width="200">
+<img src="assets/img/songbook.png" alt="Songbook" width="175">
 
 ---
 
