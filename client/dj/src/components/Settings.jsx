@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { djFetch } from '../lib/djFetch';
 
 function Field({ label, hint, children }) {
   return (
@@ -71,11 +72,11 @@ export default function Settings({ indexing, scanning }) {
 
   // ── Mount ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    fetch('/api/settings/youtube-api-key/status')
+    djFetch('/api/settings/youtube-api-key/status')
       .then((r) => r.json())
       .then((d) => { setApiKeySet(d.set); setApiKeyExpanded(!d.set); });
 
-    fetch('/api/settings')
+    djFetch('/api/settings')
       .then((r) => r.json())
       .then((s) => {
         setLocalPath(s.local_media_path || '');
@@ -86,12 +87,12 @@ export default function Settings({ indexing, scanning }) {
         setHostUrl(s.host_url || '');
       });
 
-    fetch('/api/info')
+    djFetch('/api/info')
       .then((r) => r.json())
       .then(setInfo)
       .catch(() => {});
 
-    fetch('/api/settings/dj-pin/status')
+    djFetch('/api/settings/dj-pin/status')
       .then((r) => r.json())
       .then((d) => { setPinSet(d.set); setPinExpanded(!d.set); })
       .catch(() => {});
@@ -113,17 +114,17 @@ export default function Settings({ indexing, scanning }) {
   // ── Actions ───────────────────────────────────────────────────────────────────
 
   function loadChannels() {
-    fetch('/api/channels').then((r) => r.json()).then(setChannels).catch(() => {});
+    djFetch('/api/channels').then((r) => r.json()).then(setChannels).catch(() => {});
   }
 
   async function reindexAll() {
-    await fetch('/api/channels/reindex-all', { method: 'POST' });
+    await djFetch('/api/channels/reindex-all', { method: 'POST' });
   }
 
   async function saveApiKey() {
     setSaving(true);
     try {
-      const res  = await fetch('/api/settings/youtube-api-key', {
+      const res  = await djFetch('/api/settings/youtube-api-key', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: apiKey }),
@@ -142,7 +143,7 @@ export default function Settings({ indexing, scanning }) {
   async function clearApiKey() {
     setSaving(true);
     try {
-      await fetch('/api/settings/youtube-api-key', {
+      await djFetch('/api/settings/youtube-api-key', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: '' }),
@@ -160,7 +161,7 @@ export default function Settings({ indexing, scanning }) {
   async function saveGeneralSettings() {
     setSaving(true);
     try {
-      await fetch('/api/settings', {
+      await djFetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -182,7 +183,7 @@ export default function Settings({ indexing, scanning }) {
     setAddingChannel(true);
     setChannelError('');
     try {
-      const res  = await fetch('/api/channels', {
+      const res  = await djFetch('/api/channels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: channelUrl.trim() }),
@@ -196,16 +197,16 @@ export default function Settings({ indexing, scanning }) {
   }
 
   async function reindexChannel(id) {
-    await fetch(`/api/channels/${id}/reindex`, { method: 'POST' });
+    await djFetch(`/api/channels/${id}/reindex`, { method: 'POST' });
   }
 
   async function deleteChannel(id) {
-    await fetch(`/api/channels/${id}`, { method: 'DELETE' });
+    await djFetch(`/api/channels/${id}`, { method: 'DELETE' });
     setChannels((prev) => prev.filter((c) => c.id !== id));
   }
 
   async function scanLocal() {
-    await fetch('/api/media/scan', { method: 'POST' });
+    await djFetch('/api/media/scan', { method: 'POST' });
   }
 
   async function savePin(pinOverride) {
@@ -215,7 +216,7 @@ export default function Settings({ indexing, scanning }) {
       setTimeout(() => setPinMsg(''), 3000);
       return;
     }
-    const res  = await fetch('/api/settings/dj-pin', {
+    const res  = await djFetch('/api/settings/dj-pin', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin }),

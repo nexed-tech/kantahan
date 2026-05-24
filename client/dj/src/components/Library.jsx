@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { djFetch } from '../lib/djFetch';
 
 const LAST_SINGER_KEY = 'kantahan_dj_last_singer';
 const LIMIT = 50;
@@ -149,7 +150,7 @@ function UrlPaste({ onAddToQueue }) {
     if (!id) { setError('Not a valid YouTube URL or video ID'); return; }
     setLoading(true); setError(''); setVideo(null);
     try {
-      const res = await fetch(`/api/youtube/video/${id}`);
+      const res = await djFetch(`/api/youtube/video/${id}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Video not found'); return; }
       setVideo(data);
@@ -234,7 +235,7 @@ function YouTubeResults({ query, onAddToQueue }) {
     lastQueryRef.current = query;
     setLoading(true); setError(''); setResults([]);
     try {
-      const res  = await fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
+      const res  = await djFetch(`/api/youtube/search?q=${encodeURIComponent(query)}`);
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Search failed'); return; }
       setResults(data);
@@ -353,7 +354,7 @@ export default function Library() {
   // Library songs always use add-direct (they already exist in the DB, whether YouTube or local).
   // Library queries exclude ephemeral rows so there is no ambiguity here.
   async function handleAddToQueue(song, singerName) {
-    await fetch('/api/queue/add-direct', {
+    await djFetch('/api/queue/add-direct', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ song_id: song.id, singer_name: singerName }),
@@ -362,7 +363,7 @@ export default function Library() {
 
   // YouTube search results always use add-youtube (they're never in the library)
   async function handleAddYouTube(song, singerName) {
-    await fetch('/api/queue/add-youtube', {
+    await djFetch('/api/queue/add-youtube', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

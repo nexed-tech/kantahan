@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { db } = require('../db');
 const { getQueue, syncQueue, addToQueue } = require('../services/queueService');
+const { requireDjAuth } = require('../middleware/auth');
 
 const EPHEMERAL_UPSERT = `
   INSERT INTO songs (id, title, artist, source, channel_name, thumbnail_url, duration_seconds, ephemeral)
@@ -18,14 +19,14 @@ const router = Router();
 
 router.get('/', (_req, res) => res.json(getQueue()));
 
-router.post('/', (req, res) => {
+router.post('/', requireDjAuth, (req, res) => {
   const { song_id, singer_name } = req.body;
   if (!song_id || !singer_name)
     return res.status(400).json({ error: 'song_id and singer_name required' });
   res.json(addToQueue(song_id, singer_name));
 });
 
-router.post('/add-direct', (req, res) => {
+router.post('/add-direct', requireDjAuth, (req, res) => {
   const { song_id, singer_name } = req.body;
   if (!song_id || !singer_name)
     return res.status(400).json({ error: 'song_id and singer_name required' });
@@ -35,7 +36,7 @@ router.post('/add-direct', (req, res) => {
 });
 
 // Add an ephemeral YouTube video directly to the queue (not saved to the library).
-router.post('/add-youtube', (req, res) => {
+router.post('/add-youtube', requireDjAuth, (req, res) => {
   const { video_id, title, artist, channel_name, thumbnail_url, duration_seconds, singer_name } = req.body;
   if (!video_id || !singer_name)
     return res.status(400).json({ error: 'video_id and singer_name required' });
@@ -53,13 +54,13 @@ router.post('/add-youtube', (req, res) => {
   res.json(addToQueue(video_id, singer_name));
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', requireDjAuth, (req, res) => {
   db.prepare("UPDATE queue SET status = 'skipped' WHERE id = ?").run(req.params.id);
   syncQueue();
   res.json({ ok: true });
 });
 
-router.post('/:id/bump', (req, res) => {
+router.post('/:id/bump', requireDjAuth, (req, res) => {
   const item = db
     .prepare("SELECT * FROM queue WHERE id = ? AND status = 'pending'")
     .get(req.params.id);
@@ -74,7 +75,7 @@ router.post('/:id/bump', (req, res) => {
   res.json({ ok: true });
 });
 
-router.put('/reorder', (req, res) => {
+router.put('/reorder', requireDjAuth, (req, res) => {
   const { order } = req.body;
   if (!Array.isArray(order)) return res.status(400).json({ error: 'order array required' });
 

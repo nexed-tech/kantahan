@@ -1,10 +1,11 @@
 const { Router } = require('express');
 const { getAllSettings, getSetting, setSetting } = require('../db');
 const { setState, getState } = require('../ws');
+const { requireDjAuth } = require('../middleware/auth');
 
 const router = Router();
 
-router.get('/', (_req, res) => {
+router.get('/', requireDjAuth, (_req, res) => {
   const settings = getAllSettings();
   // Never expose the raw API key or PIN hash
   const safe = {
@@ -16,7 +17,7 @@ router.get('/', (_req, res) => {
   res.json(safe);
 });
 
-router.put('/', (req, res) => {
+router.put('/', requireDjAuth, (req, res) => {
   const updates = req.body;
   for (const [key, value] of Object.entries(updates)) {
     // Never allow overwriting the PIN hash via this endpoint
@@ -66,7 +67,7 @@ router.put('/', (req, res) => {
 });
 
 // Dedicated endpoint so we never accidentally log or expose the key
-router.put('/youtube-api-key', (req, res) => {
+router.put('/youtube-api-key', requireDjAuth, (req, res) => {
   const { key } = req.body;
   if (typeof key !== 'string') return res.status(400).json({ error: 'key required' });
   setSetting('youtube_api_key', key.trim());
@@ -79,7 +80,7 @@ router.get('/youtube-api-key/status', (_req, res) => {
 });
 
 // DJ PIN management
-router.put('/dj-pin', async (req, res) => {
+router.put('/dj-pin', requireDjAuth, async (req, res) => {
   const { pin } = req.body;
   if (typeof pin !== 'string') return res.status(400).json({ error: 'pin required' });
   const bcrypt = require('bcryptjs');

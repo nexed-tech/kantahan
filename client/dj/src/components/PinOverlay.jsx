@@ -1,22 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-
-const SESSION_KEY = 'kantahan_dj_session';
-const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 hours
-
-function isSessionValid() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    if (!raw) return false;
-    const { at } = JSON.parse(raw);
-    return Date.now() - at < SESSION_TTL;
-  } catch {
-    return false;
-  }
-}
-
-function setSession() {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ at: Date.now() }));
-}
+import { isSessionValid, setSession } from '../lib/djFetch';
 
 export default function PinOverlay({ onUnlock }) {
   const [loading, setLoading] = useState(true);
@@ -49,7 +32,7 @@ export default function PinOverlay({ onUnlock }) {
     });
     const data = await res.json();
     if (data.ok) {
-      setSession();
+      setSession(data.token);
       onUnlock();
     } else {
       const next = attempts + 1;
