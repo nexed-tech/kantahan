@@ -216,6 +216,14 @@ const ready = new Promise((r) => { _readyResolve = r; });
   try { _sqlDb.exec('ALTER TABLE songs ADD COLUMN embeddable INTEGER DEFAULT 1'); } catch {}
   try { _sqlDb.exec('ALTER TABLE songs ADD COLUMN zip_mp3_entry TEXT'); } catch {}
   try { _sqlDb.exec('ALTER TABLE songs ADD COLUMN zip_cdg_entry TEXT'); } catch {}
+  try { _sqlDb.exec('ALTER TABLE songs ADD COLUMN ephemeral INTEGER DEFAULT 0'); } catch {}
+
+  // Clean up ephemeral songs from previous sessions that are no longer in the queue
+  _sqlDb.exec(`
+    DELETE FROM songs
+    WHERE ephemeral = 1
+    AND id NOT IN (SELECT song_id FROM queue WHERE status = 'pending')
+  `);
 
   // Seed default settings
   const insertDefault = _sqlDb.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');

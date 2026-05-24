@@ -17,7 +17,8 @@ const libraryRouter = require('./routes/library');
 const channelsRouter = require('./routes/channels');
 const playbackRouter = require('./routes/playback');
 const mediaRouter = require('./routes/media');
-const bgMusicRouter = require('./routes/bgmusic');
+const bgMusicRouter  = require('./routes/bgmusic');
+const youtubeRouter  = require('./routes/youtube');
 
 const app = express();
 const server = http.createServer(app);
@@ -33,7 +34,8 @@ app.use('/api/library', libraryRouter);
 app.use('/api/channels', channelsRouter);
 app.use('/api/playback', playbackRouter);
 app.use('/api/media', mediaRouter);
-app.use('/api/bgmusic', bgMusicRouter);
+app.use('/api/bgmusic',  bgMusicRouter);
+app.use('/api/youtube', youtubeRouter);
 
 function getLocalIP() {
   const nets = os.networkInterfaces();
