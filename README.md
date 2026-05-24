@@ -30,10 +30,16 @@ Three screens, one server:
 | **DJ remote** | The person running the night | Open on any browser — laptop, tablet, phone |
 | **Request**/**Songbook** | Your guests | Scan the QR code on the TV |
 
-<img src="assets/img/dj_screen.png" alt="DJ Screen" width="300">
-<img src="assets/img/tv_screen.png" alt="TV Screen" width="187">
-<img src="assets/img/request_screen.png" alt="Request Screen" width="200">
-<img src="assets/img/songbook.png" alt="Songbook" width="175">
+<table>
+  <tr>
+    <td><img src="assets/img/dj_screen.png" width="300"></td>
+    <td><img src="assets/img/tv_screen.png" width="187"></td>
+  </tr>
+  <tr>
+    <td><img src="assets/img/request_screen.png" width="200"></td>
+    <td><img src="assets/img/songbook.png" width="175"></td>
+  </tr>
+</table>
 
 ---
 
