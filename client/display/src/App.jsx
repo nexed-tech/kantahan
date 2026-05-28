@@ -3,31 +3,6 @@ import { useWebSocket } from '../../shared/useWebSocket';
 import logoUrl from './assets/logo-marquee-primary-animated.svg';
 import { CDGRenderer } from './cdgRenderer';
 
-function loadYouTubeAPI() {
-  return new Promise((resolve) => {
-    if (window.YT?.Player) { resolve(); return; }
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(); };
-    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      document.head.appendChild(tag);
-    }
-  });
-}
-
-function parseBgUrl(url) {
-  if (!url) return null;
-  try {
-    const u = new URL(url.startsWith('http') ? url : `https://${url}`);
-    const list = u.searchParams.get('list');
-    const v = u.searchParams.get('v') || (u.hostname === 'youtu.be' ? u.pathname.slice(1) : null);
-    if (list) return { list };
-    if (v) return { video: v };
-  } catch {}
-  return null;
-}
-
 function QrImg({ url, size = 200 }) {
   if (!url) return null;
   return (
@@ -35,26 +10,26 @@ function QrImg({ url, size = 200 }) {
   );
 }
 
-function IdleScreen({ requestUrl }) {
+function IdleScreen({ requestUrl, qrEnabled }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-8">
       <div className="text-center space-y-2">
         <p className="text-brand-dim font-mono uppercase tracking-[0.35em] text-sm">
-          Scan to request a song
+          {qrEnabled ? 'Scan to request a song' : 'Request a song from the DJ'}
         </p>
         <p className="text-brand-ink/60 text-xl">Pick a song &amp; get in the queue</p>
       </div>
-      {requestUrl && (
+      {qrEnabled && requestUrl && (
         <div className="bg-white rounded-2xl p-5 shadow-2xl shadow-brand-purple/20">
           <QrImg url={requestUrl} size={240} />
         </div>
       )}
-      {requestUrl && <p className="text-brand-dim font-mono text-base">{requestUrl}</p>}
+      {qrEnabled && requestUrl && <p className="text-brand-dim font-mono text-base">{requestUrl}</p>}
     </div>
   );
 }
 
-function BetweenScreen({ countdown, queue, requestUrl }) {
+function BetweenScreen({ countdown, queue, requestUrl, qrEnabled }) {
   const nextSong   = countdown?.next_song;
   const nextSinger = countdown?.next_singer;
   const upcoming   = (queue || []).slice(1, 5);
@@ -98,7 +73,7 @@ function BetweenScreen({ countdown, queue, requestUrl }) {
         </div>
       )}
 
-      {requestUrl && (
+      {qrEnabled && requestUrl && (
         <div className="absolute bottom-6 right-6 bg-white rounded-xl p-2 opacity-60">
           <QrImg url={requestUrl} size={100} />
         </div>
@@ -189,28 +164,14 @@ function PlaybackErrorOverlay({ message }) {
 export default function App() {
   const { state, connected } = useWebSocket();
 
-  // ── YouTube karaoke player ───────────────────────────────────────────────
-  const ytDivRef        = useRef(null);
-  const playerRef       = useRef(null);
-  const playerReadyRef  = useRef(false);
-  const pendingCmdRef   = useRef(null);
-  const lastCmdTs       = useRef(0);
-  const [ytError, setYtError] = useState(null);
-
   // ── Local file player ────────────────────────────────────────────────────
-  const localVideoRef   = useRef(null);  // <video> for mkv/mp4
-  const localAudioRef   = useRef(null);  // <audio> for cdg
-  const localCanvasRef  = useRef(null);  // <canvas> for cdg graphics
+  const localVideoRef   = useRef(null);
+  const localAudioRef   = useRef(null);
+  const localCanvasRef  = useRef(null);
   const cdgRendererRef  = useRef(null);
   const cdgAnimRef      = useRef(null);
   const loadedLocalId   = useRef(null);
-  const [localError, setLocalError]  = useState(null);
-
-  // ── Background music player (YouTube) ────────────────────────────────────
-  const bgDivRef        = useRef(null);
-  const bgPlayerRef     = useRef(null);
-  const bgPlayerReadyRef = useRef(false);
-  const lastBgUrlRef    = useRef('');
+  const [localError, setLocalError] = useState(null);
 
   // ── Background music player (local) ──────────────────────────────────────
   const localBgAudioRef   = useRef(null);
@@ -222,6 +183,8 @@ export default function App() {
   const modeRef = useRef('idle');
   const bgmRef  = useRef(null);
 
+  const lastCmdTs = useRef(0);
+
   const [info, setInfo] = useState(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
 
@@ -230,13 +193,10 @@ export default function App() {
   }, []);
 
   // ── Audio interaction gate ────────────────────────────────────────────────
-  // Browsers block unmuted audio until the user has interacted with the page.
-  // We detect the first interaction and permanently unlock autoplay for this tab.
   useEffect(() => {
     if (audioUnlocked) return;
     const unlock = () => {
       setAudioUnlocked(true);
-      // Resume any suspended AudioContext (belt-and-suspenders)
       try { new AudioContext().resume(); } catch {}
     };
     document.addEventListener('click',   unlock, { once: true });
@@ -261,78 +221,21 @@ export default function App() {
     return () => document.removeEventListener('keydown', onKey);
   }, []);
 
-  const mode          = state?.mode || 'idle';
-  const bgm           = state?.background_music;
-  const nowPlaying    = state?.now_playing;
-  const nowSong       = nowPlaying?.song;
-  const isLocalSong   = nowSong?.source === 'local';
-  const localType     = nowSong?.file_type;
-  const isLocalVideo  = localType === 'mkv' || localType === 'mp4';
-  const isLocalCdg    = localType === 'cdg' || localType === 'mp3cdg_zip';
+  const mode       = state?.mode || 'idle';
+  const bgm        = state?.background_music;
+  const nowPlaying = state?.now_playing;
+  const nowSong    = nowPlaying?.song;
+  const localType  = nowSong?.file_type;
+  const isLocalVideo = localType === 'mkv' || localType === 'mp4';
+  const isLocalCdg   = localType === 'cdg' || localType === 'mp3cdg_zip';
 
   modeRef.current = mode;
   bgmRef.current  = bgm;
 
-  // ── YouTube player setup ──────────────────────────────────────────────────
-
-  function execYtCmd(cmd) {
-    if (!playerRef.current || !playerReadyRef.current) {
-      pendingCmdRef.current = cmd;
-      return;
-    }
-    setYtError(null);
-    const p = playerRef.current;
-    if (cmd.action === 'load')  p.loadVideoById(cmd.video_id);
-    else if (cmd.action === 'play')  p.playVideo();
-    else if (cmd.action === 'pause') p.pauseVideo();
-    else if (cmd.action === 'stop')  p.stopVideo();
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    loadYouTubeAPI().then(() => {
-      if (cancelled || !ytDivRef.current || playerRef.current) return;
-      playerRef.current = new window.YT.Player(ytDivRef.current, {
-        height: '100%', width: '100%', videoId: '',
-        playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0,
-                      iv_load_policy: 3, modestbranding: 1, rel: 0, playsinline: 1, mute: 1 },
-        events: {
-          onReady: () => {
-            playerReadyRef.current = true;
-            if (pendingCmdRef.current) {
-              const cmd = pendingCmdRef.current;
-              pendingCmdRef.current = null;
-              execYtCmd(cmd);
-            }
-          },
-          onStateChange: (e) => {
-            // Unmute as soon as playback starts — muted autoplay is allowed by browsers,
-            // but unmuting in response to a media event (not on page load) is also permitted.
-            if (e.data === window.YT.PlayerState.PLAYING) e.target.unMute();
-            if (e.data === window.YT.PlayerState.ENDED)
-              fetch('/api/playback/ended', { method: 'POST' }).catch(() => {});
-          },
-          onError: (e) => {
-            setYtError(e.data);
-            setTimeout(() => fetch('/api/playback/ended', { method: 'POST' }).catch(() => {}), 2500);
-          },
-        },
-      });
-    });
-    return () => {
-      cancelled = true;
-      playerReadyRef.current = false;
-      if (playerRef.current) {
-        try { playerRef.current.destroy(); } catch {}
-        playerRef.current = null;
-      }
-    };
-  }, []);
-
   // ── Local player: load when song changes ─────────────────────────────────
 
   useEffect(() => {
-    if (!nowSong || nowSong.source !== 'local' || mode !== 'playing') {
+    if (!nowSong || mode !== 'playing') {
       cancelAnimationFrame(cdgAnimRef.current);
       if (mode !== 'playing') {
         loadedLocalId.current = null;
@@ -347,7 +250,6 @@ export default function App() {
     setLocalError(null);
     cancelAnimationFrame(cdgAnimRef.current);
 
-    // Guard: only the first error wins (play() rejection + onerror can both fire)
     let errorFired = false;
     function onLocalEnded() {
       fetch('/api/playback/ended', { method: 'POST' }).catch(() => {});
@@ -362,7 +264,6 @@ export default function App() {
     if (isLocalVideo && localVideoRef.current) {
       const vid = localVideoRef.current;
       vid.muted = true;
-      // Set onerror before src so we catch early load errors
       vid.onerror = () => {
         const e = vid.error;
         onLocalError(e ? `Video error (${e.code}): ${e.message}` : 'Video codec not supported');
@@ -371,7 +272,6 @@ export default function App() {
       vid.play()
         .then(() => { vid.muted = false; })
         .catch((err) => {
-          // Delay so onerror (DOM event) can fire and win if it's a media error
           setTimeout(() => onLocalError(`Video: ${err.message || err.name}`), 80);
         });
     }
@@ -380,7 +280,6 @@ export default function App() {
       if (!cdgRendererRef.current) cdgRendererRef.current = new CDGRenderer();
       const songId = nowSong.id;
 
-      // Start audio immediately — parallel with CDG fetch
       const audio = localAudioRef.current;
       if (audio) {
         audio.muted = true;
@@ -389,12 +288,10 @@ export default function App() {
         audio.play()
           .then(() => { audio.muted = false; })
           .catch((err) => {
-            if (err.name === 'AbortError') return; // src changed mid-load — expected, not an error
-            // NotAllowedError = browser blocked autoplay before user interaction.
-            // Retry once the user taps/clicks the display page.
+            if (err.name === 'AbortError') return;
             if (err.name === 'NotAllowedError') {
               const retry = () => {
-                if (loadedLocalId.current !== songId) return; // song already changed
+                if (loadedLocalId.current !== songId) return;
                 audio.play()
                   .then(() => { audio.muted = false; })
                   .catch(() => onLocalError('Audio: autoplay blocked. Tap the screen to enable audio.'));
@@ -431,7 +328,7 @@ export default function App() {
     }
 
     return () => cancelAnimationFrame(cdgAnimRef.current);
-  }, [nowSong?.id, nowSong?.source, mode]);
+  }, [nowSong?.id, mode]);
 
   // ── Player command routing ────────────────────────────────────────────────
 
@@ -440,69 +337,12 @@ export default function App() {
     if (!cmd || cmd.timestamp <= lastCmdTs.current) return;
     lastCmdTs.current = cmd.timestamp;
 
-    if (nowSong?.source === 'local') {
-      // 'load' is handled by the useEffect above (triggers on nowSong.id change)
-      const el = isLocalVideo ? localVideoRef.current : localAudioRef.current;
-      if (!el) return;
-      if (cmd.action === 'play')  el.play().catch(() => {});
-      if (cmd.action === 'pause') el.pause();
-      if (cmd.action === 'stop')  { el.pause(); el.currentTime = 0; }
-    } else {
-      execYtCmd(cmd);
-    }
+    const el = isLocalVideo ? localVideoRef.current : localAudioRef.current;
+    if (!el) return;
+    if (cmd.action === 'play')  el.play().catch(() => {});
+    if (cmd.action === 'pause') el.pause();
+    if (cmd.action === 'stop')  { el.pause(); el.currentTime = 0; }
   }, [state?.player_command]);
-
-  // ── Background music player ───────────────────────────────────────────────
-
-  function applyBgMusic() {
-    const bm = bgmRef.current;
-    const currentMode = modeRef.current;
-    if (!bgPlayerReadyRef.current || !bm) return;
-    bgPlayerRef.current.setVolume(Math.round((bm.volume ?? 0.4) * 100));
-    const shouldPlay = bm.playing && !!bm.url && (currentMode === 'idle' || currentMode === 'between');
-    if (shouldPlay) {
-      if (bm.url !== lastBgUrlRef.current) {
-        lastBgUrlRef.current = bm.url;
-        const parsed = parseBgUrl(bm.url);
-        if (parsed?.list) bgPlayerRef.current.loadPlaylist({ list: parsed.list, listType: 'playlist', index: 0 });
-        else if (parsed?.video) bgPlayerRef.current.loadVideoById(parsed.video);
-      } else {
-        if (bgPlayerRef.current.getPlayerState() !== 1) bgPlayerRef.current.playVideo();
-      }
-    } else {
-      bgPlayerRef.current.pauseVideo();
-    }
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    loadYouTubeAPI().then(() => {
-      if (cancelled || !bgDivRef.current || bgPlayerRef.current) return;
-      bgPlayerRef.current = new window.YT.Player(bgDivRef.current, {
-        height: '100%', width: '100%', videoId: '',
-        playerVars: { controls: 0, disablekb: 1, fs: 0, playsinline: 1 },
-        events: {
-          onReady: (e) => { bgPlayerReadyRef.current = true; e.target.setLoop(true); applyBgMusic(); },
-          onStateChange: (e) => {
-            if (e.data === window.YT.PlayerState.ENDED) {
-              bgPlayerRef.current?.seekTo(0, true);
-              bgPlayerRef.current?.playVideo();
-            }
-          },
-        },
-      });
-    });
-    return () => {
-      cancelled = true;
-      bgPlayerReadyRef.current = false;
-      if (bgPlayerRef.current) {
-        try { bgPlayerRef.current.destroy(); } catch {}
-        bgPlayerRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => { applyBgMusic(); }, [mode, bgm?.playing, bgm?.url, bgm?.volume]);
 
   // ── Local background music ────────────────────────────────────────────────
 
@@ -510,9 +350,9 @@ export default function App() {
     const bm = bgmRef.current;
     const currentMode = modeRef.current;
     const audio = localBgAudioRef.current;
-    if (!audio || bm?.source !== 'local') return;
+    if (!audio) return;
     const tracks = localBgTracksRef.current;
-    const shouldPlay = bm.playing && tracks.length > 0 && (currentMode === 'idle' || currentMode === 'between');
+    const shouldPlay = bm?.playing && tracks.length > 0 && (currentMode === 'idle' || currentMode === 'between');
     audio.volume = Math.max(0, Math.min(1, bm?.volume ?? 0.4));
     if (shouldPlay) {
       if (!audio.src || audio.ended) {
@@ -536,7 +376,6 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (bgm?.source !== 'local') return;
     const localPath = bgm?.local_path || '';
     if (localBgLoadedRef.current === localPath) {
       applyLocalBgMusic();
@@ -551,29 +390,24 @@ export default function App() {
         applyLocalBgMusic();
       })
       .catch(() => {});
-  }, [bgm?.source, bgm?.local_path]);
+  }, [bgm?.local_path]);
 
-  useEffect(() => {
-    if (bgm?.source === 'local') applyLocalBgMusic();
-    else if (localBgAudioRef.current) localBgAudioRef.current.pause();
-  }, [mode, bgm?.playing, bgm?.volume, bgm?.source]);
+  useEffect(() => { applyLocalBgMusic(); }, [mode, bgm?.playing, bgm?.volume]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const requestUrl    = info?.urls?.request;
-  const isPlaying     = mode === 'playing';
-  const hasError      = isPlaying && (ytError != null || localError != null);
-  const pos           = state?.playback_position;
-  const elapsed       = pos?.elapsed_seconds || 0;
-  const duration      = pos?.duration_seconds || 0;
-  const nextQueue     = state?.queue || [];
-  const showUpNext    = isPlaying && !hasError && nextQueue.length > 0
-                        && duration > 60 && (duration - elapsed) <= 60 && elapsed > 0;
-  const displayMsg    = state?.display_message;
-  const showMessage   = displayMsg?.active && displayMsg?.text && !isPlaying;
-  const errorMsg   = localError || (ytError === 101 || ytError === 150
-    ? 'Embedding disabled for this video'
-    : ytError != null ? 'Video not found or playback error' : null);
+  const requestUrl  = info?.urls?.request;
+  const qrEnabled   = state?.settings?.qr_enabled !== false;
+  const isPlaying   = mode === 'playing';
+  const hasError    = isPlaying && localError != null;
+  const pos         = state?.playback_position;
+  const elapsed     = pos?.elapsed_seconds || 0;
+  const duration    = pos?.duration_seconds || 0;
+  const nextQueue   = state?.queue || [];
+  const showUpNext  = isPlaying && !hasError && nextQueue.length > 0
+                      && duration > 60 && (duration - elapsed) <= 60 && elapsed > 0;
+  const displayMsg  = state?.display_message;
+  const showMessage = displayMsg?.active && displayMsg?.text && !isPlaying;
 
   return (
     <div
@@ -595,28 +429,9 @@ export default function App() {
       {/* Local background music (hidden audio) */}
       <audio ref={localBgAudioRef} onEnded={handleLocalBgEnded} style={{ display: 'none' }} />
 
-      {/* Background video (idle/between) — YouTube only */}
-      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-1000 ${
-        bgm?.source !== 'local' && bgm?.playing && bgm?.url && !isPlaying ? 'opacity-100' : 'opacity-0'
-      }`}>
-        <div ref={bgDivRef} className="w-full h-full" />
-      </div>
-      <div className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-1000 ${
-        bgm?.source !== 'local' && bgm?.playing && bgm?.url && !isPlaying ? 'opacity-75' : 'opacity-0'
-      }`} />
-
-      {/* YouTube karaoke player — only for YouTube songs */}
-      <div className={`absolute inset-0 transition-opacity duration-300 ${
-        isPlaying && !isLocalSong && !ytError ? 'opacity-100' : 'opacity-0 pointer-events-none'
-      }`}>
-        <div ref={ytDivRef} className="w-full h-full" />
-        {/* Transparent cover that intercepts mouse events so YouTube's hover overlay never appears */}
-        <div className="absolute inset-0" />
-      </div>
-
       {/* Local video player — mkv/mp4 */}
       <div className={`absolute inset-0 transition-opacity duration-300 ${
-        isPlaying && isLocalSong && isLocalVideo && !localError ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        isPlaying && isLocalVideo && !localError ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}>
         <video
           ref={localVideoRef}
@@ -628,7 +443,7 @@ export default function App() {
 
       {/* CDG karaoke player — mp3+cdg */}
       <div className={`absolute inset-0 bg-black flex items-center justify-center transition-opacity duration-300 ${
-        isPlaying && isLocalSong && isLocalCdg && !localError ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        isPlaying && isLocalCdg && !localError ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}>
         <audio
           ref={localAudioRef}
@@ -643,12 +458,17 @@ export default function App() {
       </div>
 
       {/* Error overlay */}
-      {hasError && <PlaybackErrorOverlay message={errorMsg} />}
+      {hasError && <PlaybackErrorOverlay message={localError} />}
 
       {/* Idle / between screens */}
-      {mode === 'idle' && <IdleScreen requestUrl={requestUrl} />}
+      {mode === 'idle' && <IdleScreen requestUrl={requestUrl} qrEnabled={qrEnabled} />}
       {mode === 'between' && (
-        <BetweenScreen countdown={state?.countdown} queue={state?.queue} requestUrl={requestUrl} />
+        <BetweenScreen
+          countdown={state?.countdown}
+          queue={state?.queue}
+          requestUrl={requestUrl}
+          qrEnabled={qrEnabled}
+        />
       )}
 
       {/* Now singing / Up next — crossfade at 1 min remaining */}
@@ -670,13 +490,13 @@ export default function App() {
         <img src={logoUrl} alt="Kantahan" style={{ width: 220, height: 'auto' }} />
       </div>
 
-      {/* Corner QR — playing: top-right, idle/between: bottom-right */}
-      {isPlaying && !hasError && requestUrl && (
+      {/* Corner QR */}
+      {qrEnabled && isPlaying && !hasError && requestUrl && (
         <div className="absolute top-4 right-4 bg-white rounded-lg p-1.5 opacity-50 hover:opacity-90 transition-opacity z-20">
           <QrImg url={requestUrl} size={84} />
         </div>
       )}
-      {!isPlaying && requestUrl && (
+      {qrEnabled && !isPlaying && requestUrl && (
         <div className="absolute bottom-6 right-6 bg-white rounded-xl p-2 opacity-75 z-20">
           <QrImg url={requestUrl} size={100} />
         </div>

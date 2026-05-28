@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { djFetch } from '../lib/djFetch';
 
 function Field({ label, hint, children }) {
@@ -11,7 +11,6 @@ function Field({ label, hint, children }) {
   );
 }
 
-// Single-line summary row shown when a section is configured and collapsed.
 function CollapsedRow({ dot, label, sublabel, onExpand }) {
   return (
     <div className="flex items-center justify-between py-0.5">
@@ -34,13 +33,7 @@ function CollapsedRow({ dot, label, sublabel, onExpand }) {
 const inputCls =
   'bg-white/5 text-brand-ink text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-purple border border-white/10 focus:border-brand-purple/50 placeholder:text-brand-dim/30 transition-colors';
 
-export default function Settings({ indexing, scanning }) {
-  // ── API key ──────────────────────────────────────────────────────────────────
-  const [apiKey, setApiKey]           = useState('');
-  const [apiKeySet, setApiKeySet]     = useState(false);
-  const [apiKeyMsg, setApiKeyMsg]     = useState('');
-  const [apiKeyExpanded, setApiKeyExpanded] = useState(true); // collapses once key is confirmed set
-
+export default function Settings({ scanning }) {
   // ── PIN ───────────────────────────────────────────────────────────────────────
   const [pinSet, setPinSet]           = useState(false);
   const [newPin, setNewPin]           = useState('');
@@ -48,21 +41,13 @@ export default function Settings({ indexing, scanning }) {
   const [pinExpanded, setPinExpanded] = useState(true);
 
   // ── General ───────────────────────────────────────────────────────────────────
-  const [localPath, setLocalPath]           = useState('');
-  const [bgMusicUrl, setBgMusicUrl]         = useState('');
-  const [bgMusicSource, setBgMusicSource]   = useState('youtube');
+  const [localPath, setLocalPath]               = useState('');
   const [bgMusicLocalPath, setBgMusicLocalPath] = useState('');
-  const [countdown, setCountdown]           = useState('10');
-  const [hostUrl, setHostUrl]               = useState('');
-  const [saving, setSaving]                 = useState(false);
-
-  // ── Channels ──────────────────────────────────────────────────────────────────
-  const [channels, setChannels]         = useState([]);
-  const [channelUrl, setChannelUrl]     = useState('');
-  const [addingChannel, setAddingChannel] = useState(false);
-  const [channelError, setChannelError] = useState('');
-  const prevIndexingActiveRef           = useRef(false);
-  const [skippedOpen, setSkippedOpen]   = useState(false);
+  const [countdown, setCountdown]               = useState('10');
+  const [hostUrl, setHostUrl]                   = useState('');
+  const [qrEnabled, setQrEnabled]               = useState(true);
+  const [saving, setSaving]                     = useState(false);
+  const [skippedOpen, setSkippedOpen]           = useState(false);
 
   // ── Info / network ────────────────────────────────────────────────────────────
   const [info, setInfo] = useState(null);
@@ -72,19 +57,14 @@ export default function Settings({ indexing, scanning }) {
 
   // ── Mount ─────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    djFetch('/api/settings/youtube-api-key/status')
-      .then((r) => r.json())
-      .then((d) => { setApiKeySet(d.set); setApiKeyExpanded(!d.set); });
-
     djFetch('/api/settings')
       .then((r) => r.json())
       .then((s) => {
         setLocalPath(s.local_media_path || '');
-        setBgMusicUrl(s.background_music_url || '');
-        setBgMusicSource(s.background_music_source || 'youtube');
         setBgMusicLocalPath(s.background_music_local_path || '');
         setCountdown(s.countdown_seconds || '10');
         setHostUrl(s.host_url || '');
+        setQrEnabled(s.qr_enabled !== 'false');
       });
 
     djFetch('/api/info')
@@ -97,66 +77,12 @@ export default function Settings({ indexing, scanning }) {
       .then((d) => { setPinSet(d.set); setPinExpanded(!d.set); })
       .catch(() => {});
 
-    // Close behaviour — only available when running inside Electron
     if (typeof window.electronAPI !== 'undefined') {
       window.electronAPI.getCloseBehaviour().then(setCloseBehaviourState);
     }
-
-    loadChannels();
   }, []);
 
-  // Reload channel list when indexing finishes
-  useEffect(() => {
-    if (prevIndexingActiveRef.current && !indexing?.active) loadChannels();
-    prevIndexingActiveRef.current = indexing?.active ?? false;
-  }, [indexing?.active]);
-
   // ── Actions ───────────────────────────────────────────────────────────────────
-
-  function loadChannels() {
-    djFetch('/api/channels').then((r) => r.json()).then(setChannels).catch(() => {});
-  }
-
-  async function reindexAll() {
-    await djFetch('/api/channels/reindex-all', { method: 'POST' });
-  }
-
-  async function saveApiKey() {
-    setSaving(true);
-    try {
-      const res  = await djFetch('/api/settings/youtube-api-key', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: apiKey }),
-      });
-      const data = await res.json();
-      setApiKeySet(data.set);
-      setApiKey('');
-      setApiKeyExpanded(!data.set); // collapse if saved, expand (to re-enter) if cleared
-      setApiKeyMsg(data.set ? 'API key saved.' : 'Key cleared.');
-      setTimeout(() => setApiKeyMsg(''), 3000);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function clearApiKey() {
-    setSaving(true);
-    try {
-      await djFetch('/api/settings/youtube-api-key', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: '' }),
-      });
-      setApiKeySet(false);
-      setApiKey('');
-      setApiKeyExpanded(true);
-      setApiKeyMsg('Key cleared.');
-      setTimeout(() => setApiKeyMsg(''), 3000);
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function saveGeneralSettings() {
     setSaving(true);
@@ -166,43 +92,15 @@ export default function Settings({ indexing, scanning }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           local_media_path: localPath,
-          background_music_url: bgMusicUrl,
-          background_music_source: bgMusicSource,
           background_music_local_path: bgMusicLocalPath,
           countdown_seconds: countdown,
           host_url: hostUrl,
+          qr_enabled: String(qrEnabled),
         }),
       });
     } finally {
       setSaving(false);
     }
-  }
-
-  async function addChannel() {
-    if (!channelUrl.trim()) return;
-    setAddingChannel(true);
-    setChannelError('');
-    try {
-      const res  = await djFetch('/api/channels', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: channelUrl.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) setChannelError(data.error || 'Failed to add channel');
-      else { setChannelUrl(''); loadChannels(); }
-    } finally {
-      setAddingChannel(false);
-    }
-  }
-
-  async function reindexChannel(id) {
-    await djFetch(`/api/channels/${id}/reindex`, { method: 'POST' });
-  }
-
-  async function deleteChannel(id) {
-    await djFetch(`/api/channels/${id}`, { method: 'DELETE' });
-    setChannels((prev) => prev.filter((c) => c.id !== id));
   }
 
   async function scanLocal() {
@@ -224,7 +122,7 @@ export default function Settings({ indexing, scanning }) {
     const data = await res.json();
     setPinSet(data.set);
     setNewPin('');
-    setPinExpanded(!data.set); // collapse if PIN was set, expand if removed
+    setPinExpanded(!data.set);
     setPinMsg(pin ? 'PIN saved.' : 'PIN removed.');
     setTimeout(() => setPinMsg(''), 3000);
   }
@@ -237,7 +135,6 @@ export default function Settings({ indexing, scanning }) {
   }
 
   // ── Derived state ─────────────────────────────────────────────────────────────
-  const isIndexing = indexing?.active;
   const isScanning = scanning?.active;
   const scanDone   = !isScanning && scanning?.processed > 0 && !scanning?.error;
 
@@ -263,215 +160,35 @@ export default function Settings({ indexing, scanning }) {
         </div>
       )}
 
-      {/* ── YouTube API key ── */}
-      <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
-        {apiKeySet && !apiKeyExpanded ? (
-          <div className="px-4 py-3">
-            <CollapsedRow
-              dot="bg-green-400"
-              label="YouTube API key"
-              sublabel="configured"
-              onExpand={() => setApiKeyExpanded(true)}
-            />
-          </div>
-        ) : (
-          <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">YouTube</p>
-              {apiKeySet && (
-                <button
-                  onClick={() => setApiKeyExpanded(false)}
-                  className="text-brand-dim/40 hover:text-brand-dim transition-colors text-xs font-mono"
-                >
-                  collapse ↑
-                </button>
-              )}
-            </div>
-            <Field
-              label="API Key"
-              hint={apiKeySet
-                ? 'A key is saved. Enter a new one to replace it.'
-                : 'Required for YouTube channel indexing and search.'}
-            >
-              <div className="flex gap-2 mt-1">
-                <input
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={apiKeySet ? '••••••••••••' : 'AIza...'}
-                  className={`flex-1 ${inputCls}`}
-                />
-                <button
-                  onClick={saveApiKey}
-                  disabled={saving}
-                  className="bg-brand-purple hover:bg-brand-purple/80 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-                >
-                  Save
-                </button>
-                {apiKeySet && (
-                  <button
-                    onClick={clearApiKey}
-                    disabled={saving}
-                    className="bg-brand-pink/20 hover:bg-brand-pink/30 disabled:opacity-50 text-brand-pink text-sm px-3 py-2 rounded-lg transition-colors"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              {apiKeyMsg && <p className="text-green-400 text-xs mt-1 font-mono">{apiKeyMsg}</p>}
-            </Field>
-          </div>
-        )}
-      </div>
-
-      {/* ── YouTube channels ── */}
-      <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
-        <div className="flex items-center justify-between">
-          <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">YouTube Channels</p>
-          <button
-            onClick={reindexAll}
-            disabled={isIndexing || channels.length === 0}
-            className="text-xs bg-brand-purple/20 hover:bg-brand-purple/30 disabled:opacity-40 text-brand-purple px-2.5 py-1 rounded-lg transition-colors"
-            title="Re-index all channels"
-          >
-            ↻ Re-index all
-          </button>
-        </div>
-
-        {isIndexing && (
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs text-brand-dim/60 font-mono">
-              <span>Indexing {indexing.channel_name}...</span>
-              <span>{indexing.processed} videos</span>
-            </div>
-            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-brand-purple animate-pulse w-full" />
-            </div>
-          </div>
-        )}
-        {!isIndexing && indexing?.error && (
-          <p className="text-brand-pink text-xs font-mono">Error: {indexing.error}</p>
-        )}
-        {!isIndexing && indexing?.processed > 0 && !indexing?.error && (
-          <p className="text-green-400 text-xs font-mono">
-            Indexed {indexing.processed} songs from {indexing.channel_name}
-            {indexing.skipped > 0 && (
-              <span className="text-brand-dim/60">, skipped {indexing.skipped} (embedding disabled)</span>
-            )}
-            {indexing.removed > 0 && (
-              <span className="text-brand-dim/60">, removed {indexing.removed} deleted</span>
-            )}
-          </p>
-        )}
-
-        {channels.length > 0 && (
-          <ul className="space-y-2">
-            {channels.map((ch) => {
-              const isPending = ch.id.startsWith('pending_');
-              return (
-                <li
-                  key={ch.id}
-                  className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2 border border-white/5"
-                >
-                  <div className="min-w-0">
-                    <p className="text-brand-ink text-sm truncate">{ch.name}</p>
-                    {isPending ? (
-                      <p className="text-brand-amber/60 text-xs font-mono">Not indexed — press ↻ to add</p>
-                    ) : ch.video_count > 0 ? (
-                      <p className="text-brand-dim/50 text-xs font-mono">{ch.video_count} videos</p>
-                    ) : null}
-                  </div>
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      onClick={() => reindexChannel(ch.id)}
-                      disabled={isIndexing}
-                      className="text-xs bg-brand-purple/20 hover:bg-brand-purple/30 disabled:opacity-40 text-brand-purple px-2 py-1 rounded"
-                      title="Re-index"
-                    >
-                      ↻
-                    </button>
-                    <button
-                      onClick={() => deleteChannel(ch.id)}
-                      disabled={isIndexing}
-                      className="text-xs bg-brand-pink/15 hover:bg-brand-pink/25 disabled:opacity-40 text-brand-pink px-2 py-1 rounded"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        <Field label="Add channel" hint="YouTube channel URL or handle (e.g. @channelname)">
-          <div className="flex gap-2 mt-1">
-            <input
-              type="text"
-              value={channelUrl}
-              onChange={(e) => setChannelUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addChannel()}
-              placeholder="https://youtube.com/@..."
-              disabled={isIndexing}
-              className={`flex-1 disabled:opacity-40 ${inputCls}`}
-            />
-            <button
-              onClick={addChannel}
-              disabled={addingChannel || isIndexing || !channelUrl.trim()}
-              className="bg-brand-purple hover:bg-brand-purple/80 disabled:opacity-50 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-            >
-              {addingChannel ? '...' : 'Add'}
-            </button>
-          </div>
-          {channelError && <p className="text-brand-pink text-xs mt-1 font-mono">{channelError}</p>}
-        </Field>
-      </div>
-
       {/* ── General settings ── */}
       <div className="bg-white/5 rounded-xl p-4 space-y-4 border border-white/10">
         <p className="text-brand-dim/60 text-xs font-mono uppercase tracking-widest">General</p>
 
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-brand-dim">Background music source</label>
-          <div className="flex gap-2">
-            {[['youtube', 'YouTube'], ['local', 'Local files']].map(([val, lbl]) => (
-              <button
-                key={val}
-                onClick={() => setBgMusicSource(val)}
-                className={`text-sm px-3 py-1.5 rounded-lg border transition-colors ${
-                  bgMusicSource === val
-                    ? 'bg-brand-purple/20 border-brand-purple/50 text-brand-purple'
-                    : 'bg-white/5 border-white/10 text-brand-dim hover:border-white/20'
-                }`}
-              >
-                {lbl}
-              </button>
-            ))}
-          </div>
-          {bgMusicSource === 'youtube' && (
-            <input
-              type="text"
-              value={bgMusicUrl}
-              onChange={(e) => setBgMusicUrl(e.target.value)}
-              placeholder="https://youtube.com/playlist?list=..."
-              className={`w-full ${inputCls}`}
-            />
-          )}
-          {bgMusicSource === 'local' && (
-            <input
-              type="text"
-              value={bgMusicLocalPath}
-              onChange={(e) => setBgMusicLocalPath(e.target.value)}
-              placeholder="C:\music\background"
-              className={`w-full ${inputCls}`}
-            />
-          )}
-          <p className="text-brand-dim/40 text-xs font-mono">
-            {bgMusicSource === 'youtube'
-              ? 'YouTube video or playlist to play between songs'
-              : 'Folder with MP3/MP4 files to shuffle between songs'}
-          </p>
-        </div>
+        <Field
+          label="Local media folder"
+          hint="Path to folder with .mp3/.cdg pairs or .mkv/.mp4 files"
+        >
+          <input
+            type="text"
+            value={localPath}
+            onChange={(e) => setLocalPath(e.target.value)}
+            placeholder="C:\karaoke\files"
+            className={`w-full ${inputCls}`}
+          />
+        </Field>
+
+        <Field
+          label="Background music folder"
+          hint="Folder with MP3/MP4 files to shuffle between songs"
+        >
+          <input
+            type="text"
+            value={bgMusicLocalPath}
+            onChange={(e) => setBgMusicLocalPath(e.target.value)}
+            placeholder="C:\music\background"
+            className={`w-full ${inputCls}`}
+          />
+        </Field>
 
         <Field label="Countdown duration (seconds)">
           <input
@@ -497,18 +214,27 @@ export default function Settings({ indexing, scanning }) {
           />
         </Field>
 
-        <Field
-          label="Local media folder"
-          hint="Path to folder with .mp3/.cdg pairs or .mkv/.mp4 files"
-        >
-          <input
-            type="text"
-            value={localPath}
-            onChange={(e) => setLocalPath(e.target.value)}
-            placeholder="C:\karaoke\files"
-            className={`w-full ${inputCls}`}
-          />
-        </Field>
+        {/* QR code toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-brand-dim">QR code on display</p>
+            <p className="text-xs text-brand-dim/50">
+              {qrEnabled ? 'Guests scan to request songs' : 'Hidden — use paper slips instead'}
+            </p>
+          </div>
+          <button
+            onClick={() => setQrEnabled((v) => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              qrEnabled ? 'bg-brand-purple' : 'bg-white/20'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                qrEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <button

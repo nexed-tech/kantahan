@@ -3,18 +3,6 @@ const { db } = require('../db');
 const { getQueue, syncQueue, addToQueue } = require('../services/queueService');
 const { requireDjAuth } = require('../middleware/auth');
 
-const EPHEMERAL_UPSERT = `
-  INSERT INTO songs (id, title, artist, source, channel_name, thumbnail_url, duration_seconds, ephemeral)
-  VALUES (?, ?, ?, 'youtube', ?, ?, ?, 1)
-  ON CONFLICT(id) DO UPDATE SET
-    title            = excluded.title,
-    artist           = excluded.artist,
-    channel_name     = excluded.channel_name,
-    thumbnail_url    = excluded.thumbnail_url,
-    duration_seconds = excluded.duration_seconds,
-    ephemeral        = 1
-`;
-
 const router = Router();
 
 router.get('/', (_req, res) => res.json(getQueue()));
@@ -33,25 +21,6 @@ router.post('/add-direct', requireDjAuth, (req, res) => {
   const song = db.prepare('SELECT id FROM songs WHERE id = ?').get(song_id);
   if (!song) return res.status(404).json({ error: 'Song not found' });
   res.json(addToQueue(song_id, singer_name));
-});
-
-// Add an ephemeral YouTube video directly to the queue (not saved to the library).
-router.post('/add-youtube', requireDjAuth, (req, res) => {
-  const { video_id, title, artist, channel_name, thumbnail_url, duration_seconds, singer_name } = req.body;
-  if (!video_id || !singer_name)
-    return res.status(400).json({ error: 'video_id and singer_name required' });
-
-  db.run(
-    EPHEMERAL_UPSERT,
-    video_id,
-    title || 'Unknown',
-    artist || null,
-    channel_name || null,
-    thumbnail_url || null,
-    duration_seconds || null
-  );
-
-  res.json(addToQueue(video_id, singer_name));
 });
 
 router.delete('/:id', requireDjAuth, (req, res) => {

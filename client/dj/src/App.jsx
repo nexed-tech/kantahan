@@ -499,7 +499,7 @@ export default function App() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              <Settings indexing={state?.indexing} scanning={state?.scanning} />
+              <Settings scanning={state?.scanning} />
             </div>
           </div>
         </div>
