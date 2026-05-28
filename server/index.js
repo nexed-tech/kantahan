@@ -15,11 +15,9 @@ const settingsRouter = require('./routes/api');
 const { router: queueRouter } = require('./routes/queue');
 const requestsRouter = require('./routes/requests');
 const libraryRouter = require('./routes/library');
-const channelsRouter = require('./routes/channels');
 const playbackRouter = require('./routes/playback');
 const mediaRouter = require('./routes/media');
 const bgMusicRouter  = require('./routes/bgmusic');
-const youtubeRouter  = require('./routes/youtube');
 
 const app = express();
 const server = http.createServer(app);
@@ -32,11 +30,9 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/queue', queueRouter);
 app.use('/api/requests', requestsRouter);
 app.use('/api/library', libraryRouter);
-app.use('/api/channels', channelsRouter);
 app.use('/api/playback', requireDjAuth, playbackRouter);
 app.use('/api/media', mediaRouter);
 app.use('/api/bgmusic',  bgMusicRouter);
-app.use('/api/youtube', requireDjAuth, youtubeRouter);
 
 function getLocalIP() {
   const nets = os.networkInterfaces();
@@ -136,12 +132,13 @@ dbReady.then(() => {
       auto_queue: dbSettings.auto_queue === 'true',
       auto_start: dbSettings.auto_start === 'true',
       countdown_seconds: parseInt(dbSettings.countdown_seconds) || 10,
+      qr_enabled: dbSettings.qr_enabled !== 'false',
     },
     background_music: {
       playing: false,
       volume: parseFloat(dbSettings.background_music_volume || '0.4'),
       url: dbSettings.background_music_url || '',
-      source: dbSettings.background_music_source || 'youtube',
+      source: dbSettings.background_music_source || 'local',
       local_path: dbSettings.background_music_local_path || '',
     },
     display_message: {

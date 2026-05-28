@@ -1,7 +1,6 @@
 const initSqlJs = require('sql.js');
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
 
 const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'data', 'karaoke.db');
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -115,17 +114,17 @@ const defaultSettings = {
   auto_queue: 'true',
   auto_start: 'false',
   countdown_seconds: '10',
-  background_music_source: 'youtube',
+  background_music_source: 'local',
   background_music_url: '',
   background_music_local_path: '',
   local_media_path: '',
-  youtube_api_key: '',
   host_url: '',
   mdns_name: 'kantahan',
   display_message: '',
   display_message_active: 'false',
   display_message_position: 'bottom',
   display_message_scroll: 'false',
+  qr_enabled: 'true',
 };
 
 function getSetting(key) {
@@ -141,20 +140,6 @@ function getAllSettings() {
   const rows = db.prepare('SELECT key, value FROM settings').all();
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }
-
-// ─── Default channels ───────────────────────────────────────────────────────
-
-const DEFAULT_CHANNELS = [
-  { url: 'https://www.youtube.com/@youtubekaraokechannel', name: '@youtubekaraokechannel' },
-  { url: 'https://www.youtube.com/@ZoomKaraokeOfficial',   name: '@ZoomKaraokeOfficial'   },
-  { url: 'https://www.youtube.com/@CCKaraoke',             name: '@CCKaraoke'             },
-  { url: 'https://www.youtube.com/@KaraokeOnVEVO',         name: '@KaraokeOnVEVO'         },
-  { url: 'https://www.youtube.com/@karaokeytv0618',        name: '@karaokeytv0618'        },
-  { url: 'https://www.youtube.com/@StingrayKaraoke',       name: '@StingrayKaraoke'       },
-  { url: 'https://www.youtube.com/@OneOPMKaraoke',         name: '@OneOPMKaraoke'         },
-  { url: 'https://www.youtube.com/@AtomicKaraoke',         name: '@AtomicKaraoke'         },
-  { url: 'https://www.youtube.com/@karaOcraze',            name: '@karaOcraze'            },
-];
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 
@@ -225,6 +210,9 @@ const ready = new Promise((r) => { _readyResolve = r; });
     AND id NOT IN (SELECT song_id FROM queue WHERE status = 'pending')
   `);
 
+  // Remove any previously indexed YouTube songs (no longer playable)
+  _sqlDb.exec(`DELETE FROM songs WHERE source = 'youtube'`);
+
   // Seed default settings
   const insertDefault = _sqlDb.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
   for (const [key, value] of Object.entries(defaultSettings)) {
@@ -233,18 +221,6 @@ const ready = new Promise((r) => { _readyResolve = r; });
     insertDefault.reset();
   }
   insertDefault.free();
-
-  // Seed default channels
-  const seedChannel = _sqlDb.prepare(
-    'INSERT INTO channels (id, name, url) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM channels WHERE url = ?)'
-  );
-  for (const ch of DEFAULT_CHANNELS) {
-    const tempId = `pending_${crypto.createHash('sha1').update(ch.url).digest('hex').slice(0, 12)}`;
-    seedChannel.bind([tempId, ch.name, ch.url, ch.url]);
-    seedChannel.step();
-    seedChannel.reset();
-  }
-  seedChannel.free();
 
   // Save initial state and enable writes
   _suppressSave = false;

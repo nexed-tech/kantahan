@@ -297,7 +297,7 @@ export default function App() {
               <div className="text-center py-8">
                 <p className="text-brand-dim/60 text-sm">No songs found for "{query}"</p>
                 <p className="text-brand-dim/40 text-xs mt-1 font-mono">
-                  Ask the DJ to index some channels
+                  Ask the DJ to scan the local song library
                 </p>
               </div>
             ) : (

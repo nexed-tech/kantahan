@@ -12,14 +12,7 @@ const TYPE_BADGE = {
   mp3:        { label: 'MP3',     cls: 'bg-teal-950/60 text-teal-400 border-teal-800/40' },
 };
 
-function TypeBadge({ source, fileType }) {
-  if (source === 'youtube') {
-    return (
-      <span className="text-[10px] font-mono bg-red-950/60 text-red-400 px-1 py-0.5 rounded border border-red-800/40 shrink-0">
-        YT
-      </span>
-    );
-  }
+function TypeBadge({ fileType }) {
   const info = TYPE_BADGE[fileType] || {
     label: (fileType || 'LOCAL').toUpperCase(),
     cls: 'bg-white/10 text-brand-dim/50 border-white/10',
@@ -31,7 +24,7 @@ function TypeBadge({ source, fileType }) {
   );
 }
 
-// Shared singer-name confirm row used by both library and YouTube results.
+// Singer-name confirm row shown when adding a song to the queue.
 function SingerInput({ onConfirm, onCancel }) {
   const [singerName, setSingerName] = useState(
     () => localStorage.getItem(LAST_SINGER_KEY) || ''
@@ -84,8 +77,7 @@ function SongRow({ song, onAddToQueue }) {
     setTimeout(() => setSuccess(false), 2500);
   }
 
-  const subtitle = [song.artist, song.source === 'youtube' ? song.channel_name : null]
-    .filter(Boolean).join(' · ') || '—';
+  const subtitle = song.artist || '—';
 
   return (
     <li className="bg-white/5 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
@@ -99,7 +91,7 @@ function SongRow({ song, onAddToQueue }) {
           <p className="text-brand-ink text-xs font-medium truncate leading-snug">{song.title}</p>
           <div className="flex items-center gap-1.5 mt-0.5">
             <p className="text-brand-dim/50 text-[11px] truncate leading-tight min-w-0">{subtitle}</p>
-            <TypeBadge source={song.source} fileType={song.file_type} />
+            <TypeBadge fileType={song.file_type} />
           </div>
         </div>
         {success ? (
