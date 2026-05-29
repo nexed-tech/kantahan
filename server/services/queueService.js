@@ -1,4 +1,4 @@
-const { db, getSetting } = require('../db');
+const { db, getSetting, setSetting, getAllSettings } = require('../db');
 const { setState, getState } = require('../ws');
 const { insertWithRotation } = require('./rotation');
 
@@ -66,4 +66,20 @@ function addToQueue(songId, singerName) {
   return { id: result.lastInsertRowid, position };
 }
 
-module.exports = { getQueue, syncQueue, addToQueue };
+function disableRotation() {
+  setSetting('singer_rotation', 'false');
+  const s = getAllSettings();
+  setState({
+    settings: {
+      auto_approve:      s.auto_approve === 'true',
+      singer_rotation:   false,
+      auto_play:         s.auto_play === 'true',
+      auto_queue:        s.auto_queue === 'true',
+      auto_start:        s.auto_start === 'true',
+      countdown_seconds: parseInt(s.countdown_seconds) || 10,
+      qr_enabled:        s.qr_enabled !== 'false',
+    },
+  });
+}
+
+module.exports = { getQueue, syncQueue, addToQueue, disableRotation };

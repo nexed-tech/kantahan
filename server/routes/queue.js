@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { db } = require('../db');
-const { getQueue, syncQueue, addToQueue } = require('../services/queueService');
+const { getQueue, syncQueue, addToQueue, disableRotation } = require('../services/queueService');
 const { requireDjAuth } = require('../middleware/auth');
 
 const router = Router();
@@ -41,6 +41,7 @@ router.post('/:id/bump', requireDjAuth, (req, res) => {
   db.prepare('UPDATE queue SET position = 1 WHERE id = ?').run(req.params.id);
 
   syncQueue();
+  disableRotation();
   res.json({ ok: true });
 });
 
@@ -54,6 +55,7 @@ router.put('/reorder', requireDjAuth, (req, res) => {
   db.exec('COMMIT');
 
   syncQueue();
+  disableRotation();
   res.json({ ok: true });
 });
 
