@@ -4,7 +4,23 @@ const crypto = require('crypto');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobeStatic = require('ffprobe-static');
 const AdmZip = require('adm-zip');
-const { parseSongTitle } = require('./youtube');
+function parseSongTitle(raw) {
+  let t = raw
+    .replace(/\s*\|\s*karaoke.*/gi, '')
+    .replace(/\s*[([](karaoke\s*(?:version|track)?)[)\]]/gi, '')
+    .replace(/\s+karaoke\s*(?:version|track)?\s*$/gi, '')
+    .trim();
+
+  const sep = t.match(/\s*[-–]\s+/);
+  if (sep) {
+    const idx = t.search(/\s*[-–]\s+/);
+    const left = t.slice(0, idx).trim();
+    const right = t.slice(idx).replace(/^\s*[-–]\s+/, '').trim();
+    if (left && right) return { artist: left, title: right };
+  }
+
+  return { artist: null, title: t };
+}
 
 // In a packaged Electron app the path is fixed by the main process via FFPROBE_PATH
 ffmpeg.setFfprobePath(process.env.FFPROBE_PATH || ffprobeStatic.path);
